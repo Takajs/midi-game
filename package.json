@@ -1,0 +1,20 @@
+{
+  "name": "midi-game",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@tonejs/midi": "^2.0.28",
+    "pixi.js": "^8.17.1",
+    "tone": "^15.1.22",
+    "vite": "^6.4.1"
+  }
+}
