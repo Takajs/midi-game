@@ -116,8 +116,7 @@ export class Player {
     const r = this.radius;
     const breath = 0.5 + 0.5 * Math.sin(this.time * 0.04);
     const speed = Math.sqrt(this.velX * this.velX + this.velY * this.velY);
-
-    // Outer aura — soft, large, breathing
+    // Outer aura
     const auraR = r + 8 + breath * 4;
     this.gfx.circle(0, 0, auraR);
     this.gfx.fill({ color: 0x8b7ad8, alpha: 0.06 + breath * 0.025 });
@@ -141,15 +140,6 @@ export class Player {
     // Bright core
     this.gfx.circle(0, 0, 3.5);
     this.gfx.fill({ color: 0xffffff, alpha: 0.95 });
-
-    // Engine glow (bottom) — scales with speed
-    const engineSize = 2.5 + speed * 0.4 + breath * 1.5;
-    this.gfx.circle(0, r + 3, engineSize + 4);
-    this.gfx.fill({ color: 0x60a5fa, alpha: 0.06 + speed * 0.015 });
-    this.gfx.circle(0, r + 3, engineSize);
-    this.gfx.fill({ color: 0x93c5fd, alpha: 0.35 + speed * 0.08 });
-    this.gfx.circle(0, r + 3, engineSize * 0.35);
-    this.gfx.fill({ color: 0xffffff, alpha: 0.65 });
 
     // Focus mode — precision rings
     if (isFocused) {

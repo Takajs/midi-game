@@ -73,6 +73,10 @@ export class Boss {
     this.script = null;
     this.midiMin = 0;
     this.midiMax = 127;
+
+    // Per-level customization
+    this.hasRing = false;
+    this.spikeStyle = 'default'; // 'default' | 'sharp' | 'organic'
   }
 
   setScript(analysis, midiMin, midiMax) {
@@ -288,6 +292,68 @@ export class Boss {
       }
     }
 
+    // ── 2b. Saturn-style ring ──
+    if (this.hasRing) {
+      const ringW = r * 1.8;
+      const ringH = r * 0.35;
+      const ringTilt = time * 0.003;
+      const ringPulse = 1 + Math.sin(time * 0.03) * 0.03 + fireIntensity * 0.08;
+
+      // Draw 3 nested elliptical rings for depth
+      for (let band = 0; band < 3; band++) {
+        const bandScale = 1.0 + band * 0.18;
+        const bw = ringW * bandScale * ringPulse;
+        const bh = ringH * ringPulse;
+        const bandAlpha = (0.18 - band * 0.04) + intensity * 0.08;
+        const bandWidth = 2.2 - band * 0.5 + intensity * 0.8;
+
+        // Draw ellipse as a series of line segments
+        const steps = 48;
+        const cosT = Math.cos(ringTilt);
+        const sinT = Math.sin(ringTilt);
+        for (let i = 0; i < steps; i++) {
+          const a0 = (Math.PI * 2 * i) / steps;
+          const a1 = (Math.PI * 2 * (i + 1)) / steps;
+          const ex0 = Math.cos(a0) * bw;
+          const ey0 = Math.sin(a0) * bh;
+          const ex1 = Math.cos(a1) * bw;
+          const ey1 = Math.sin(a1) * bh;
+          // Rotate by tilt
+          const rx0 = ex0 * cosT - ey0 * sinT;
+          const ry0 = ex0 * sinT + ey0 * cosT;
+          const rx1 = ex1 * cosT - ey1 * sinT;
+          const ry1 = ex1 * sinT + ey1 * cosT;
+
+          this.shieldGfx.moveTo(x + rx0, y + ry0);
+          this.shieldGfx.lineTo(x + rx1, y + ry1);
+          this.shieldGfx.stroke({
+            color: band === 0 ? color : 0xffffff,
+            width: bandWidth,
+            alpha: bandAlpha * (0.6 + 0.4 * Math.abs(Math.sin(a0 * 2))),
+          });
+        }
+      }
+
+      // Ring glow — subtle fill of the middle band
+      const glowSteps = 36;
+      const cosT = Math.cos(ringTilt);
+      const sinT = Math.sin(ringTilt);
+      const gw = ringW * 1.18 * ringPulse;
+      const gh = ringH * ringPulse;
+      this.shieldGfx.moveTo(
+        x + gw * cosT,
+        y + gw * sinT
+      );
+      for (let i = 1; i <= glowSteps; i++) {
+        const a = (Math.PI * 2 * i) / glowSteps;
+        const ex = Math.cos(a) * gw;
+        const ey = Math.sin(a) * gh;
+        this.shieldGfx.lineTo(x + ex * cosT - ey * sinT, y + ex * sinT + ey * cosT);
+      }
+      this.shieldGfx.closePath();
+      this.shieldGfx.fill({ color, alpha: 0.02 + intensity * 0.015 });
+    }
+
     // ── 3. Mandala — ominous, multi-layered, pulsing sigil ──
     const n = Math.max(3, Math.round(voices));
     const outerM = r * 0.95;
@@ -295,65 +361,182 @@ export class Boss {
     const mandalaSpeed = 0.025 + intensity * 0.15;
     const mandalaRot = time * mandalaSpeed;
 
-    // Layer 0: main sigil — thick, filled, always visible
     const mg = this.mandalaGfx;
     const mPulse = 1 + Math.sin(time * 0.05) * 0.04 + fireIntensity * 0.12;
+    const style = this.spikeStyle;
 
-    // Outer spikes — jagged teeth reaching out from the body
-    const spikeN = n * 2;
-    const spikeOuter = outerM * mPulse * 1.15;
-    const spikeInner = outerM * mPulse * 0.75;
-    mg.moveTo(
-      x + Math.cos(mandalaRot) * spikeOuter,
-      y + Math.sin(mandalaRot) * spikeOuter
-    );
-    for (let i = 1; i <= spikeN * 2; i++) {
-      const a = mandalaRot + (Math.PI * i) / spikeN;
-      const sr = i % 2 === 0 ? spikeOuter : spikeInner;
-      mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+    // ── Outer layer — style-dependent ──
+    if (style === 'sharp') {
+      // Sharp: many narrow spikes with deep valleys — menacing crown
+      const spikeN = n * 3;
+      const spikeOuter = outerM * mPulse * 1.2;
+      const spikeInner = outerM * mPulse * 0.55; // deeper valleys
+      mg.moveTo(
+        x + Math.cos(mandalaRot) * spikeOuter,
+        y + Math.sin(mandalaRot) * spikeOuter
+      );
+      for (let i = 1; i <= spikeN * 2; i++) {
+        const a = mandalaRot + (Math.PI * i) / spikeN;
+        const sr = i % 2 === 0 ? spikeOuter : spikeInner;
+        mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+      }
+      mg.closePath();
+      mg.stroke({ color, width: 1.0 + intensity * 1.2, alpha: 0.22 + intensity * 0.14 });
+      mg.fill({ color, alpha: 0.02 + intensity * 0.015 });
+
+      // Sharp secondary — thin inner thorns, fast counter-rotation
+      const thorn2Rot = -mandalaRot * 1.7;
+      const thorn2N = spikeN;
+      const thorn2Outer = outerM * mPulse * 0.85;
+      const thorn2Inner = outerM * mPulse * 0.4;
+      mg.moveTo(
+        x + Math.cos(thorn2Rot) * thorn2Outer,
+        y + Math.sin(thorn2Rot) * thorn2Outer
+      );
+      for (let i = 1; i <= thorn2N * 2; i++) {
+        const a = thorn2Rot + (Math.PI * i) / thorn2N;
+        const sr = i % 2 === 0 ? thorn2Outer : thorn2Inner;
+        mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+      }
+      mg.closePath();
+      mg.stroke({ color: 0xffffff, width: 0.6 + intensity * 0.4, alpha: 0.1 + intensity * 0.08 });
+
+    } else if (style === 'organic') {
+      // Organic: smooth flowing tentacle curves using quadratic bezier
+      const tentacleN = Math.max(4, n);
+      const tentR = outerM * mPulse * 1.1;
+      const tentInner = outerM * mPulse * 0.6;
+      for (let i = 0; i < tentacleN; i++) {
+        const baseA = mandalaRot + (Math.PI * 2 * i) / tentacleN;
+        const nextA = mandalaRot + (Math.PI * 2 * (i + 1)) / tentacleN;
+        const midA = (baseA + nextA) / 2;
+        // Wavy tentacle tip
+        const waveOff = Math.sin(time * 0.04 + i * 1.5) * 0.15;
+        const tipR = tentR * (1 + waveOff);
+
+        mg.moveTo(
+          x + Math.cos(baseA) * tentInner,
+          y + Math.sin(baseA) * tentInner
+        );
+        mg.quadraticCurveTo(
+          x + Math.cos(midA) * tipR,
+          y + Math.sin(midA) * tipR,
+          x + Math.cos(nextA) * tentInner,
+          y + Math.sin(nextA) * tentInner
+        );
+        mg.stroke({ color, width: 1.5 + intensity * 1.0, alpha: 0.18 + intensity * 0.1 });
+      }
+
+      // Organic fill — soft bulging shape
+      mg.moveTo(
+        x + Math.cos(mandalaRot) * tentInner,
+        y + Math.sin(mandalaRot) * tentInner
+      );
+      for (let i = 0; i < tentacleN; i++) {
+        const baseA = mandalaRot + (Math.PI * 2 * i) / tentacleN;
+        const nextA = mandalaRot + (Math.PI * 2 * (i + 1)) / tentacleN;
+        const midA = (baseA + nextA) / 2;
+        const waveOff = Math.sin(time * 0.04 + i * 1.5) * 0.15;
+        mg.quadraticCurveTo(
+          x + Math.cos(midA) * tentR * (1 + waveOff),
+          y + Math.sin(midA) * tentR * (1 + waveOff),
+          x + Math.cos(nextA) * tentInner,
+          y + Math.sin(nextA) * tentInner
+        );
+      }
+      mg.closePath();
+      mg.fill({ color, alpha: 0.025 + intensity * 0.02 });
+
+    } else {
+      // Default: original jagged teeth
+      const spikeN = n * 2;
+      const spikeOuter = outerM * mPulse * 1.15;
+      const spikeInner = outerM * mPulse * 0.75;
+      mg.moveTo(
+        x + Math.cos(mandalaRot) * spikeOuter,
+        y + Math.sin(mandalaRot) * spikeOuter
+      );
+      for (let i = 1; i <= spikeN * 2; i++) {
+        const a = mandalaRot + (Math.PI * i) / spikeN;
+        const sr = i % 2 === 0 ? spikeOuter : spikeInner;
+        mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+      }
+      mg.closePath();
+      mg.stroke({ color, width: 1.2 + intensity * 1.0, alpha: 0.2 + intensity * 0.12 });
+      mg.fill({ color, alpha: 0.025 + intensity * 0.02 });
     }
-    mg.closePath();
-    mg.stroke({ color, width: 1.2 + intensity * 1.0, alpha: 0.2 + intensity * 0.12 });
-    mg.fill({ color, alpha: 0.025 + intensity * 0.02 });
 
     // Inner star — counter-rotating, sharper, brighter
     const innerRot = -mandalaRot * 1.3;
     const innerOuter = innerM * mPulse * 2.2;
-    const innerInner = innerM * mPulse * 0.6;
+    const innerInner = innerM * mPulse * (style === 'sharp' ? 0.35 : style === 'organic' ? 0.8 : 0.6);
+    const innerN = style === 'sharp' ? n * 2 : n;
     mg.moveTo(
       x + Math.cos(innerRot) * innerOuter,
       y + Math.sin(innerRot) * innerOuter
     );
-    for (let i = 1; i <= n * 2; i++) {
-      const a = innerRot + (Math.PI * i) / n;
-      const sr = i % 2 === 0 ? innerOuter : innerInner;
-      mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+    if (style === 'organic') {
+      // Organic inner: smooth lobes
+      for (let i = 0; i < innerN; i++) {
+        const baseA = innerRot + (Math.PI * 2 * i) / innerN;
+        const nextA = innerRot + (Math.PI * 2 * (i + 1)) / innerN;
+        const midA = (baseA + nextA) / 2;
+        mg.quadraticCurveTo(
+          x + Math.cos(midA) * innerOuter * 0.5,
+          y + Math.sin(midA) * innerOuter * 0.5,
+          x + Math.cos(nextA) * innerOuter,
+          y + Math.sin(nextA) * innerOuter
+        );
+      }
+    } else {
+      for (let i = 1; i <= innerN * 2; i++) {
+        const a = innerRot + (Math.PI * i) / innerN;
+        const sr = i % 2 === 0 ? innerOuter : innerInner;
+        mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+      }
     }
     mg.closePath();
     mg.stroke({ color: 0xffffff, width: 0.8 + intensity * 0.5, alpha: 0.15 + intensity * 0.1 });
     mg.fill({ color, alpha: 0.03 + intensity * 0.02 });
 
     // Connecting radial lines — web-like threads from center to outer tips
-    for (let i = 0; i < spikeN; i++) {
-      const a = mandalaRot + (Math.PI * 2 * i) / spikeN;
+    const radialN = style === 'sharp' ? n * 3 : n * 2;
+    for (let i = 0; i < radialN; i++) {
+      const a = mandalaRot + (Math.PI * 2 * i) / radialN;
+      const lineR = outerM * mPulse * (style === 'sharp' ? 1.1 : style === 'organic' ? 0.95 : 1.05);
       mg.moveTo(x, y);
-      mg.lineTo(x + Math.cos(a) * spikeOuter * 0.9, y + Math.sin(a) * spikeOuter * 0.9);
+      mg.lineTo(x + Math.cos(a) * lineR, y + Math.sin(a) * lineR);
       mg.stroke({ color, width: 0.5, alpha: 0.06 + intensity * 0.06 });
     }
 
-    // During high intensity: third layer — ghostly expanded copy
+    // During high intensity: ghostly expanded copy
     if (intensity > 0.4) {
       const ghostRot = mandalaRot * 0.7 + 0.5;
       const ghostR = outerM * mPulse * 1.4;
-      const ghostInner = outerM * mPulse * 0.5;
+      const ghostInner = outerM * mPulse * (style === 'sharp' ? 0.3 : 0.5);
+      const ghostN = style === 'sharp' ? n * 2 : n;
       mg.moveTo(
         x + Math.cos(ghostRot) * ghostR,
         y + Math.sin(ghostRot) * ghostR
       );
-      for (let i = 1; i <= n * 2; i++) {
-        const a = ghostRot + (Math.PI * i) / n;
-        const sr = i % 2 === 0 ? ghostR : ghostInner;
-        mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+      if (style === 'organic') {
+        for (let i = 0; i < ghostN; i++) {
+          const baseA = ghostRot + (Math.PI * 2 * i) / ghostN;
+          const nextA = ghostRot + (Math.PI * 2 * (i + 1)) / ghostN;
+          const midA = (baseA + nextA) / 2;
+          mg.quadraticCurveTo(
+            x + Math.cos(midA) * ghostR * 1.1,
+            y + Math.sin(midA) * ghostR * 1.1,
+            x + Math.cos(nextA) * ghostInner,
+            y + Math.sin(nextA) * ghostInner
+          );
+        }
+      } else {
+        for (let i = 1; i <= ghostN * 2; i++) {
+          const a = ghostRot + (Math.PI * i) / ghostN;
+          const sr = i % 2 === 0 ? ghostR : ghostInner;
+          mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+        }
       }
       mg.closePath();
       mg.stroke({

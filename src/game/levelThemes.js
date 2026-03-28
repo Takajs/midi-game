@@ -32,6 +32,7 @@ export const LEVELS = [
       ambientGlow: { color: 0xff8844, alpha: 0.02 },
     },
     bossColor: 0xdd8844,
+    boss: { scale: 0.7, ring: false, spikes: 'sharp' },
     gameplay: { speedMult: 1.25, sizeMult: 0.75 },
   },
   {
@@ -55,6 +56,7 @@ export const LEVELS = [
       ambientGlow: { color: 0xccaa44, alpha: 0.025 },
     },
     bossColor: 0xddaa44,
+    boss: { scale: 0.9, ring: false, spikes: 'organic' },
     gameplay: { speedMult: 0.85, sizeMult: 1.3 },
   },
   {
@@ -78,6 +80,7 @@ export const LEVELS = [
       ambientGlow: { color: 0x4488cc, alpha: 0.02 },
     },
     bossColor: 0x4488cc,
+    boss: { scale: 1.0, ring: false, spikes: 'default' },
     gameplay: { speedMult: 1.0, sizeMult: 1.0 },
   },
   {
@@ -100,6 +103,7 @@ export const LEVELS = [
       ambientGlow: { color: 0xaaaacc, alpha: 0.015 },
     },
     bossColor: 0x9999cc,
+    boss: { scale: 0.6, ring: false, spikes: 'organic' },
     gameplay: { speedMult: 0.7, sizeMult: 0.85 },
   },
   {
@@ -123,6 +127,7 @@ export const LEVELS = [
       ambientGlow: { color: 0xcc3322, alpha: 0.025 },
     },
     bossColor: 0xcc4422,
+    boss: { scale: 0.85, ring: false, spikes: 'sharp' },
     gameplay: { speedMult: 1.3, sizeMult: 1.1 },
   },
   {
@@ -147,6 +152,7 @@ export const LEVELS = [
       ambientGlow: { color: 0xcc8833, alpha: 0.03 },
     },
     bossColor: 0xcc8833,
+    boss: { scale: 1.4, ring: false, spikes: 'organic' },
     gameplay: { speedMult: 0.9, sizeMult: 1.5 },
   },
   {
@@ -171,6 +177,7 @@ export const LEVELS = [
       ambientGlow: { color: 0xccaa55, alpha: 0.02 },
     },
     bossColor: 0xccaa44,
+    boss: { scale: 1.2, ring: true, spikes: 'default' },
     gameplay: { speedMult: 1.05, sizeMult: 1.15 },
   },
   {
@@ -194,6 +201,7 @@ export const LEVELS = [
       ambientGlow: { color: 0x44bbdd, alpha: 0.025 },
     },
     bossColor: 0x44aacc,
+    boss: { scale: 1.1, ring: false, spikes: 'sharp' },
     gameplay: { speedMult: 1.2, sizeMult: 0.9 },
   },
 ];

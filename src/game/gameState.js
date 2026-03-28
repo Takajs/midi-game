@@ -24,6 +24,7 @@ export class GameState {
     this.bulletsDodged = 0;
     this.bombCharges = 3;
     this.bossHits = 0;
+    this.lastMilestone = 0;
   }
 
   loseLife() {

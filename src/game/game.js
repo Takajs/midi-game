@@ -18,8 +18,8 @@ import { Graphics } from 'pixi.js';
 // ─── Player shot constants ───
 const SHOT_SPEED = 7;
 const SHOT_RADIUS = 3;
-const SHOT_COOLDOWN = 8; // frames between shots
-const MAX_PLAYER_SHOTS = 30;
+const SHOT_COOLDOWN = 5; // frames between shots
+const MAX_PLAYER_SHOTS = 60;
 
 export class Game {
   constructor() {
@@ -58,6 +58,7 @@ export class Game {
     this.victoryScreen = document.getElementById('victory-screen');
     this.victoryStats = document.getElementById('victory-stats');
     this.scorePopupsEl = document.getElementById('score-popups');
+    this.milestoneEl = document.getElementById('milestone-notify');
 
     this.lastFrameTime = 0;
     this._boundUpdate = this._update.bind(this);
@@ -175,10 +176,21 @@ export class Game {
 
     // Configure boss with pre-computed script
     this.boss.reset();
-    if (this.theme && this.theme.bossColor !== undefined) {
-      this.boss.color = this.theme.bossColor;
-      // Tint the pre-computed boss colors toward the theme color
-      this._tintBossColors(this.songAnalysis, this.theme.bossColor);
+    if (this.theme) {
+      if (this.theme.bossColor !== undefined) {
+        this.boss.color = this.theme.bossColor;
+        this._tintBossColors(this.songAnalysis, this.theme.bossColor);
+      }
+      // Per-planet boss size
+      if (this.theme.boss) {
+        const scale = this.theme.boss.scale || 1;
+        if (scale !== 1) {
+          const radii = this.songAnalysis.bossRadius;
+          for (let i = 0; i < radii.length; i++) radii[i] *= scale;
+        }
+        this.boss.hasRing = !!this.theme.boss.ring;
+        this.boss.spikeStyle = this.theme.boss.spikes || 'default';
+      }
     }
     this.boss.setScript(this.songAnalysis, this.midiData.midiMin, this.midiData.midiMax);
 
@@ -294,7 +306,7 @@ export class Game {
     }
 
     this._checkGraze();
-    this.state.addScore(Math.floor(dt * 10));
+    this._checkMilestone();
 
     // Render
     this.bullets.render();
@@ -569,15 +581,72 @@ export class Game {
     this.victoryScreen.classList.add('active');
   }
 
+  _checkMilestone() {
+    const milestone = Math.floor(this.state.score / 50000);
+    if (milestone <= this.state.lastMilestone) return;
+    this.state.lastMilestone = milestone;
+
+    // Randomly award life or bomb
+    const isLife = Math.random() < 0.5;
+    if (isLife) {
+      this.state.lives++;
+    } else {
+      this.state.bombCharges++;
+    }
+    this._updateHUD();
+
+    // Quick reward chime via Tone.js
+    this._playRewardChime();
+
+    // Visual notification
+    const el = this.milestoneEl;
+    el.textContent = isLife ? '+1 Life' : '+1 Bomb';
+    el.className = 'milestone-notify active ' + (isLife ? 'life-reward' : 'bomb-reward');
+    // Reset animation
+    el.offsetWidth; // force reflow
+    el.classList.add('animate');
+    clearTimeout(this._milestoneTimeout);
+    this._milestoneTimeout = setTimeout(() => {
+      el.classList.remove('active', 'animate');
+    }, 2200);
+
+    // Particles burst at player
+    this.particles.spawnHitRing(this.player.x, this.player.y);
+  }
+
+  _playRewardChime() {
+    try {
+      const now = this.audio._started ? undefined : undefined;
+      // Use existing Tone.js — create a quick disposable synth
+      import('tone').then(Tone => {
+        const synth = new Tone.Synth({
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.01, decay: 0.15, sustain: 0.1, release: 0.3 },
+          volume: -8,
+        }).toDestination();
+        synth.triggerAttackRelease('C6', '8n');
+        setTimeout(() => {
+          synth.triggerAttackRelease('E6', '8n');
+        }, 100);
+        setTimeout(() => {
+          synth.triggerAttackRelease('G6', '8n');
+          setTimeout(() => synth.dispose(), 500);
+        }, 200);
+      });
+    } catch { /* ignore audio errors */ }
+  }
+
   _updateHUD() {
+    const maxLives = Math.max(3, this.state.lives);
     let livesHTML = '';
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < maxLives; i++) {
       livesHTML += `<div class="life ${i >= this.state.lives ? 'lost' : ''}"></div>`;
     }
     this.livesEl.innerHTML = livesHTML;
 
+    const maxBombs = Math.max(3, this.state.bombCharges);
     let bombsHTML = '';
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < maxBombs; i++) {
       bombsHTML += `<div class="bomb-charge ${i >= this.state.bombCharges ? 'used' : ''}"></div>`;
     }
     this.bombsEl.innerHTML = bombsHTML;
