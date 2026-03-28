@@ -118,22 +118,78 @@
     /* HUD */
     #hud {
       position: absolute; top: 0; left: 0; right: 0; z-index: 50;
-      padding: 12px 20px;
-      display: none; justify-content: space-between; align-items: center;
+      padding: 14px 24px;
+      display: none; justify-content: space-between; align-items: flex-start;
       font-family: 'Segoe UI', system-ui, sans-serif;
       color: #c4b5fd;
       pointer-events: none;
     }
     #hud.active { display: flex; }
-    #hud .lives { display: flex; gap: 6px; }
+
+    #hud .hud-left { display: flex; flex-direction: column; gap: 8px; }
+
+    /* Lives row */
+    #hud .hud-row { display: flex; align-items: center; gap: 8px; }
+    #hud .hud-label {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #8888bb; min-width: 46px;
+    }
+    #hud .hud-icons { display: flex; gap: 6px; }
+
     #hud .life {
-      width: 12px; height: 12px; border-radius: 50%;
-      background: #f472b6; box-shadow: 0 0 8px rgba(244, 114, 182, 0.5);
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #f472b6; box-shadow: 0 0 10px rgba(244, 114, 182, 0.5);
       transition: all 0.3s ease;
     }
-    #hud .life.lost { background: #333; box-shadow: none; }
-    #hud .score { font-size: 0.85rem; letter-spacing: 0.1em; }
+    #hud .life.lost {
+      background: rgba(244, 114, 182, 0.12);
+      box-shadow: none;
+      border: 1px solid rgba(244, 114, 182, 0.2);
+    }
+
+    /* Bomb charges */
+    #hud .bomb-charge {
+      width: 16px; height: 16px; border-radius: 3px;
+      background: #60a5fa; box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+      transition: all 0.3s ease;
+    }
+    #hud .bomb-charge.used {
+      background: rgba(96, 165, 250, 0.12);
+      box-shadow: none;
+      border: 1px solid rgba(96, 165, 250, 0.2);
+    }
+
+    #hud .score { font-size: 0.9rem; letter-spacing: 0.1em; }
     #hud .song-title { font-size: 0.75rem; color: #6666aa; letter-spacing: 0.05em; }
+
+    /* Score popups */
+    #score-popups {
+      position: absolute; inset: 0; z-index: 60;
+      pointer-events: none; overflow: hidden;
+    }
+    .score-popup {
+      position: absolute;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-weight: 600;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+      animation: scoreFloat 0.8s ease-out forwards;
+      text-shadow: 0 0 6px currentColor;
+    }
+    .score-popup.eye-hit {
+      font-size: 1rem;
+      color: #fbbf24;
+    }
+    .score-popup.body-hit {
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+    @keyframes scoreFloat {
+      0%   { opacity: 1; transform: translateY(0) scale(1.2); }
+      30%  { opacity: 1; transform: translateY(-12px) scale(1); }
+      100% { opacity: 0; transform: translateY(-35px) scale(0.85); }
+    }
   </style>
 </head>
 <body>
@@ -155,12 +211,22 @@
 
     <!-- HUD -->
     <div id="hud">
-      <div>
-        <div class="lives" id="lives"></div>
+      <div class="hud-left">
+        <div class="hud-row">
+          <span class="hud-label">Life</span>
+          <div class="hud-icons" id="lives"></div>
+        </div>
+        <div class="hud-row">
+          <span class="hud-label">Bomb</span>
+          <div class="hud-icons" id="bombs"></div>
+        </div>
       </div>
       <div class="song-title" id="song-title"></div>
       <div class="score" id="score">Score: 0</div>
     </div>
+
+    <!-- Score popups container -->
+    <div id="score-popups"></div>
 
     <!-- Game Over Screen -->
     <div id="game-over-screen">
