@@ -14,8 +14,8 @@ export const LEVELS = [
   {
     id: 'Mercurio',
     file: 'Mercurio.mid',
-    name: 'Mercurio',
-    subtitle: 'Scorched Messenger',
+    name: 'nivel noob 1',
+    subtitle: 'para noobs',
     difficulty: 1,
     css: {
       gradient: 'radial-gradient(circle at 35% 35%, #b8a090 0%, #7a6050 50%, #3a2820 100%)',
@@ -38,9 +38,9 @@ export const LEVELS = [
   {
     id: 'Venus',
     file: 'Venus.mid',
-    name: 'Venus',
-    subtitle: 'Veiled Inferno',
-    difficulty: 3,
+    name: 'nivel noob 2',
+    subtitle: 'para noobs',
+    difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 40% 30%, #e8c86a 0%, #c49a3a 45%, #6a4a18 100%)',
       glow: 'rgba(220, 180, 80, 0.5)',
@@ -62,8 +62,8 @@ export const LEVELS = [
   {
     id: 'Tierra',
     file: 'Tierra.mid',
-    name: 'Tierra',
-    subtitle: 'Pale Blue Dot',
+    name: 'nivel noob 3',
+    subtitle: 'para noobs',
     difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 40% 35%, #6ab4e8 0%, #3a8a3a 40%, #2a4a6a 100%)',
@@ -86,8 +86,8 @@ export const LEVELS = [
   {
     id: 'Luna',
     file: 'Luna.mid',
-    name: 'Luna',
-    subtitle: 'Silent Guardian',
+    name: 'una de Bach',
+    subtitle: 'la mitica',
     difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 38% 32%, #e0dcd8 0%, #a8a4a0 50%, #58544e 100%)',
@@ -109,8 +109,8 @@ export const LEVELS = [
   {
     id: 'Marte',
     file: 'Marte.mid',
-    name: 'Marte',
-    subtitle: 'Crimson Wrath',
+    name: 'arenisca',
+    subtitle: 'planeta arenisca',
     difficulty: 3,
     css: {
       gradient: 'radial-gradient(circle at 35% 35%, #d47050 0%, #9a3a28 50%, #4a1a10 100%)',
@@ -133,8 +133,8 @@ export const LEVELS = [
   {
     id: 'Jupiter',
     file: 'Jupiter.mid',
-    name: 'Jupiter',
-    subtitle: 'King of Storms',
+    name: 'lag',
+    subtitle: 'va lag si mantienes movimiento pulsado jeje luego se arregla uwu',
     difficulty: 5,
     css: {
       gradient: 'radial-gradient(circle at 40% 35%, #d4a060 0%, #b07830 40%, #6a4420 100%)',
@@ -158,8 +158,8 @@ export const LEVELS = [
   {
     id: 'Saturno',
     file: 'Saturno.mid',
-    name: 'Saturno',
-    subtitle: 'Lord of the Rings',
+    name: 'nivel jodido',
+    subtitle: ':(',
     difficulty: 4,
     css: {
       gradient: 'radial-gradient(circle at 38% 35%, #e8d498 0%, #c4a458 45%, #7a6430 100%)',
@@ -183,8 +183,8 @@ export const LEVELS = [
   {
     id: 'Urano',
     file: 'Urano.mid',
-    name: 'Urano',
-    subtitle: 'Frozen Enigma',
+    name: 'lo q sea',
+    subtitle: 'nose',
     difficulty: 3,
     css: {
       gradient: 'radial-gradient(circle at 42% 38%, #88dde8 0%, #50a0b8 50%, #1a4a5a 100%)',

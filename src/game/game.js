@@ -547,7 +547,7 @@ export class Game {
       setTimeout(() => {
         this._stopGame();
         this.gameOverStats.textContent =
-          `Score: ${this.state.score.toLocaleString()} | Survived: ${this.state.survivalPercent}% of the song`;
+          `PUNTUACIÓN: ${this.state.score.toLocaleString()} | Te has pasado el: ${this.state.survivalPercent}% del nivel`;
         this.gameOverScreen.classList.add('active');
       }, 1500);
     }
@@ -577,7 +577,7 @@ export class Game {
   _onVictory() {
     this._stopGame();
     this.victoryStats.textContent =
-      `Score: ${this.state.score.toLocaleString()} | Lives remaining: ${this.state.lives} | Grazes: ${this.state.grazeCount} | Boss hits: ${this.state.bossHits}`;
+      `PUNTUACIÓN: ${this.state.score.toLocaleString()} | VIDAS RESTANTES: ${this.state.lives} | Grazes: ${this.state.grazeCount} | Boss hits: ${this.state.bossHits}`;
     this.victoryScreen.classList.add('active');
   }
 
@@ -600,7 +600,7 @@ export class Game {
 
     // Visual notification
     const el = this.milestoneEl;
-    el.textContent = isLife ? '+1 Life' : '+1 Bomb';
+    el.textContent = isLife ? '+1 VIDA' : '+1 BOMBA';
     el.className = 'milestone-notify active ' + (isLife ? 'life-reward' : 'bomb-reward');
     // Reset animation
     el.offsetWidth; // force reflow
@@ -651,7 +651,7 @@ export class Game {
     }
     this.bombsEl.innerHTML = bombsHTML;
 
-    this.scoreEl.textContent = `Score: ${this.state.score.toLocaleString()}`;
+    this.scoreEl.textContent = `PUNTUACIÓN: ${this.state.score.toLocaleString()}`;
   }
 
   _tintBossColors(analysis, themeColor) {
