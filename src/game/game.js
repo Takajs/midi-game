@@ -582,7 +582,7 @@ export class Game {
   }
 
   _checkMilestone() {
-    const milestone = Math.floor(this.state.score / 50000);
+    const milestone = Math.floor(this.state.score / 75000);
     if (milestone <= this.state.lastMilestone) return;
     this.state.lastMilestone = milestone;
 
