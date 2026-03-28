@@ -234,6 +234,10 @@ export class BulletSystem {
     this.container.addChild(this.trailGfx);
     this.container.addChild(this.bodyGfx);
 
+    // Theme color tint (0 = no tint)
+    this.tintColor = 0;
+    this.tintBlend = 0;
+
     // ── Free-list: O(1) spawn instead of O(n) scan ──
     this.freeStack = new Int32Array(BULLET_POOL_SIZE);
     this.freeCount = BULLET_POOL_SIZE;
@@ -259,7 +263,9 @@ export class BulletSystem {
     d.vx[idx]      = vx;
     d.vy[idx]      = vy;
     d.radius[idx]  = radius;
-    d.color[idx]   = noteColor(midiNote);
+    d.color[idx]   = this.tintBlend > 0
+      ? this._blendColor(noteColor(midiNote), this.tintColor, this.tintBlend)
+      : noteColor(midiNote);
     d.alive[idx]   = 1;
     d.age[idx]     = 0;
     d.angVel[idx]  = angVel;
@@ -453,6 +459,13 @@ export class BulletSystem {
       }
     }
     return false;
+  }
+
+  _blendColor(c1, c2, t) {
+    const r = Math.round(((c1 >> 16) & 0xff) * (1 - t) + ((c2 >> 16) & 0xff) * t);
+    const g = Math.round(((c1 >> 8) & 0xff) * (1 - t) + ((c2 >> 8) & 0xff) * t);
+    const b = Math.round((c1 & 0xff) * (1 - t) + (c2 & 0xff) * t);
+    return (r << 16) | (g << 8) | b;
   }
 
   clearAll() {

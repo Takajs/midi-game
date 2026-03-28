@@ -18,6 +18,7 @@ export class PatternSpawner {
     this.boss = null;
     this.spiralAngle = 0;
     this._edgeSide = 0;
+    this.theme = null; // { speedMult, sizeMult }
   }
 
   getPattern(note) {
@@ -57,10 +58,11 @@ export class PatternSpawner {
     const pat = this.getPattern(note);
     const { midi, velocity: vel, octave: oct, duration } = note;
     const w = gameBounds.width, h = gameBounds.height;
-    const spd = 1.2 + vel * 1.5 + oct * 0.12;
-    const baseRad = Math.max(2.5, 6.5 - oct * 0.4 + vel * 2);
-    // Velocity-based size variation: loud notes = bigger bullets
-    const bossRad = baseRad * (1.1 + vel * 0.5);  // 1.1× to 1.6× depending on velocity
+    const spdMult = this.theme ? this.theme.speedMult : 1;
+    const sizMult = this.theme ? this.theme.sizeMult : 1;
+    const spd = (1.2 + vel * 1.5 + oct * 0.12) * spdMult;
+    const baseRad = Math.max(2.5, 6.5 - oct * 0.4 + vel * 2) * sizMult;
+    const bossRad = baseRad * (1.1 + vel * 0.5);
     const ambRad = baseRad * 0.6;
     const rng = seededRandom(midi * 31 + Math.floor(performance.now()));
     const mn = midi, nv = vel, oc = oct, dur = duration || 0.2;

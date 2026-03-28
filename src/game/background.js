@@ -2,8 +2,8 @@ import { Graphics, Container } from 'pixi.js';
 import { gameBounds } from '../utils/constants.js';
 
 /**
- * Serene, stable fullscreen background — deep space with parallax star layers.
- * Redraws vignette/bg on resize. Stars scale to fill the screen.
+ * Serene, stable fullscreen background — deep space with parallax star layers
+ * and a per-level nebula fog that gives each planet its visual identity.
  */
 export class Background {
   constructor() {
@@ -13,6 +13,10 @@ export class Background {
     // Deep dark base (redrawn on resize)
     this.bg = new Graphics();
     this.container.addChild(this.bg);
+
+    // Nebula layer — large soft colored fog, drawn once per theme
+    this.nebulaGfx = new Graphics();
+    this.container.addChild(this.nebulaGfx);
 
     // Star layers
     this.starLayers = [];
@@ -32,13 +36,37 @@ export class Background {
     this.time = 0;
     this._lastW = 0;
     this._lastH = 0;
+    this._bgColor = 0x05050e;
+    this._vignetteColor = 0x000000;
+    this._nebulae = null; // array of { x, y, radius, color, alpha }
+    this._drawStatic();
+  }
+
+  setTheme(colors) {
+    if (colors) {
+      this._bgColor = colors.bg || 0x05050e;
+      this._vignetteColor = colors.vignette || 0x000000;
+      this._nebulae = colors.nebulae || null;
+      if (colors.stars && colors.stars.length === 3) {
+        for (let l = 0; l < this.starLayers.length; l++) {
+          this.starLayers[l].color = colors.stars[l];
+        }
+      }
+    } else {
+      this._bgColor = 0x05050e;
+      this._vignetteColor = 0x000000;
+      this._nebulae = null;
+      const defaults = [0x6666aa, 0x8888cc, 0xaaaaee];
+      for (let l = 0; l < this.starLayers.length; l++) {
+        this.starLayers[l].color = defaults[l];
+      }
+    }
     this._drawStatic();
   }
 
   _initStars() {
     const w = gameBounds.width;
     const h = gameBounds.height;
-    // Scale star count to screen area relative to a 1920x1080 baseline
     const areaScale = (w * h) / (1920 * 1080);
 
     const layers = [
@@ -70,29 +98,48 @@ export class Background {
     // Background fill
     this.bg.clear();
     this.bg.rect(0, 0, w, h);
-    this.bg.fill({ color: 0x05050e });
+    this.bg.fill({ color: this._bgColor });
+
+    // Nebula fog — concentric circles fading out, positioned per theme
+    this.nebulaGfx.clear();
+    if (this._nebulae) {
+      for (const n of this._nebulae) {
+        const cx = n.x * w;
+        const cy = n.y * h;
+        const maxR = n.radius * Math.max(w, h);
+        const rings = 10;
+        for (let i = rings; i >= 0; i--) {
+          const t = i / rings;
+          const r = maxR * t;
+          const a = n.alpha * (1 - t) * (1 - t);
+          this.nebulaGfx.circle(cx, cy, r);
+          this.nebulaGfx.fill({ color: n.color, alpha: a });
+        }
+      }
+    }
 
     // Vignette
+    const vc = this._vignetteColor;
     this.vignette.clear();
     const topDepth = Math.round(h * 0.1);
     for (let i = 0; i < topDepth; i++) {
       const alpha = 0.4 * Math.pow(1 - i / topDepth, 2);
       this.vignette.rect(0, i, w, 1);
-      this.vignette.fill({ color: 0x000000, alpha });
+      this.vignette.fill({ color: vc, alpha });
     }
     const botDepth = Math.round(h * 0.08);
     for (let i = 0; i < botDepth; i++) {
       const alpha = 0.35 * Math.pow(1 - i / botDepth, 2);
       this.vignette.rect(0, h - i, w, 1);
-      this.vignette.fill({ color: 0x000000, alpha });
+      this.vignette.fill({ color: vc, alpha });
     }
     const sideDepth = Math.round(w * 0.03);
     for (let i = 0; i < sideDepth; i++) {
       const alpha = 0.2 * Math.pow(1 - i / sideDepth, 2);
       this.vignette.rect(i, 0, 1, h);
-      this.vignette.fill({ color: 0x000000, alpha });
+      this.vignette.fill({ color: vc, alpha });
       this.vignette.rect(w - i, 0, 1, h);
-      this.vignette.fill({ color: 0x000000, alpha });
+      this.vignette.fill({ color: vc, alpha });
     }
 
     this._lastW = w;
@@ -105,7 +152,6 @@ export class Background {
     const w = gameBounds.width;
     const h = gameBounds.height;
 
-    // Redraw static elements if screen resized
     if (w !== this._lastW || h !== this._lastH) {
       this._drawStatic();
     }

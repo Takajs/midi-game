@@ -36,6 +36,7 @@ export class Game {
     this.state = new GameState();
     this.midiData = null;
     this.songAnalysis = null;
+    this.theme = null;
 
     // Wire boss to patterns
     this.patterns.boss = this.boss;
@@ -113,8 +114,9 @@ export class Game {
     });
   }
 
-  async loadAndStart(midiData) {
+  async loadAndStart(midiData, levelTheme) {
     this.midiData = midiData;
+    this.theme = levelTheme;
     this.loadingIndicator.classList.add('active');
     await new Promise(r => setTimeout(r, 100));
 
@@ -154,8 +156,26 @@ export class Game {
     // Clear score popups
     this.scorePopupsEl.innerHTML = '';
 
+    // Apply level theme
+    const themeColors = this.theme ? this.theme.colors : null;
+    const themeGameplay = this.theme ? this.theme.gameplay : null;
+    this.background.setTheme(themeColors);
+    this.patterns.theme = themeGameplay;
+    if (this.theme && this.theme.bossColor !== undefined) {
+      this.bullets.tintColor = this.theme.bossColor;
+      this.bullets.tintBlend = 0.3;
+    } else {
+      this.bullets.tintColor = 0;
+      this.bullets.tintBlend = 0;
+    }
+
     // Configure boss with pre-computed script
     this.boss.reset();
+    if (this.theme && this.theme.bossColor !== undefined) {
+      this.boss.color = this.theme.bossColor;
+      // Tint the pre-computed boss colors toward the theme color
+      this._tintBossColors(this.songAnalysis, this.theme.bossColor);
+    }
     this.boss.setScript(this.songAnalysis, this.midiData.midiMin, this.midiData.midiMax);
 
     this.audio.stop();
@@ -403,10 +423,6 @@ export class Game {
         this.patterns.spawnForNote(note, this.player.x, this.player.y);
       }
 
-      // Visual feedback
-      this.particles.spawnBloom(spawnX, 4, note.midi, note.velocity);
-      this.particles.spawnNoteEmber(note.midi, spawnX, note.velocity);
-
       // Thunderbolt
       if (note.octave <= 2 && note.velocity > 0.72 && this._boltCooldown <= 0) {
         const color = noteColor(note.midi);
@@ -522,5 +538,23 @@ export class Game {
     this.bombsEl.innerHTML = bombsHTML;
 
     this.scoreEl.textContent = `Score: ${this.state.score.toLocaleString()}`;
+  }
+
+  _tintBossColors(analysis, themeColor) {
+    if (!analysis || !analysis.bossColor) return;
+    const tr = (themeColor >> 16) & 0xff;
+    const tg = (themeColor >> 8) & 0xff;
+    const tb = themeColor & 0xff;
+    const blend = 0.45; // 45% theme, 55% original
+    const colors = analysis.bossColor;
+    for (let i = 0; i < colors.length; i++) {
+      const or = (colors[i] >> 16) & 0xff;
+      const og = (colors[i] >> 8) & 0xff;
+      const ob = colors[i] & 0xff;
+      const r = Math.round(or * (1 - blend) + tr * blend);
+      const g = Math.round(og * (1 - blend) + tg * blend);
+      const b = Math.round(ob * (1 - blend) + tb * blend);
+      colors[i] = (r << 16) | (g << 8) | b;
+    }
   }
 }
