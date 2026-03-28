@@ -393,8 +393,8 @@ export class BulletSystem {
       const vx = d.vx[i], vy = d.vy[i];
       const speed = Math.sqrt(vx * vx + vy * vy);
 
-      // ── Birth burst: bullets pop in at 1.4× and settle to 1× over 6 frames ──
-      const birthScale = age < 6 ? 1 + (1 - age / 6) * 0.4 : 1;
+      // ── Birth burst: bullets pop in at 1.6× and settle to 1× over 6 frames ──
+      const birthScale = age < 6 ? 1 + (1 - age / 6) * 0.6 : 1;
       const fadeIn = Math.min(1, age / 7);
 
       const travelAngle = speed > 0.2 ? Math.atan2(vy, vx) : age * 0.03;
@@ -406,7 +406,7 @@ export class BulletSystem {
         const octFactor = oct <= 2 ? 1.4 : oct <= 4 ? 1.0 : 0.55;
         const durFactor = 0.5 + Math.min(dur, 2) * 0.5;
         const bossFactor = isBoss ? 1.3 : 1;
-        const trailLen = (4 + speed * 3.5) * octFactor * durFactor * bossFactor;
+        const trailLen = (5 + speed * 5) * octFactor * durFactor * bossFactor;
         const nx = vx / speed, ny = vy / speed;
 
         tg.moveTo(bx, by);
@@ -417,13 +417,13 @@ export class BulletSystem {
 
       // ── Outer glow (boss bullets get stronger glow) ──
       if (isBoss) {
-        const glowR = pr + (oct <= 2 ? 8 : oct <= 4 ? 5 : 3);
+        const glowR = pr + (oct <= 2 ? 12 : oct <= 4 ? 8 : 5);
         bg.circle(bx, by, glowR);
-        bg.fill({ color, alpha: fadeIn * (oct <= 2 ? 0.06 : 0.035) });
+        bg.fill({ color, alpha: fadeIn * (oct <= 2 ? 0.08 : 0.045) });
       } else {
-        const glowR = pr + (oct <= 2 ? 4 : oct <= 4 ? 2 : 0.5);
+        const glowR = pr + (oct <= 2 ? 6 : oct <= 4 ? 3 : 1.5);
         bg.circle(bx, by, glowR);
-        bg.fill({ color, alpha: fadeIn * (oct <= 2 ? 0.03 : 0.015) });
+        bg.fill({ color, alpha: fadeIn * (oct <= 2 ? 0.04 : 0.02) });
       }
 
       // ── Shape ──

@@ -234,34 +234,43 @@ export class Boss {
     const { x, y, radius: r, color, voices, time, shieldAngle,
             fireIntensity, intensity, hitFlash } = this;
 
-    // ── 1. Aura ──
-    for (let i = 3; i >= 0; i--) {
-      const aR = r * (1.6 + i * 0.35);
-      const beatPulse = 1 + fireIntensity * 0.18;
-      const pulse = beatPulse + Math.sin(time * 0.04 + i * 1.2) * 0.06;
+    // ── 1. Aura — 6 concentric rings, pulsing outward ──
+    for (let i = 5; i >= 0; i--) {
+      const aR = r * (1.5 + i * 0.3);
+      const beatPulse = 1 + fireIntensity * 0.25;
+      const pulse = beatPulse + Math.sin(time * 0.04 + i * 1.0) * 0.06;
       this.auraGfx.circle(x, y, aR * pulse);
-      this.auraGfx.fill({ color, alpha: (0.015 - i * 0.002) + fireIntensity * 0.008 });
+      this.auraGfx.fill({ color, alpha: (0.025 - i * 0.003) + fireIntensity * 0.01 });
+    }
+
+    // Pulsing outer ring (expands/contracts with fire)
+    if (fireIntensity > 0.1) {
+      const pulseR = r * (2.8 + fireIntensity * 1.2 + Math.sin(time * 0.1) * 0.15);
+      this.auraGfx.circle(x, y, pulseR);
+      this.auraGfx.stroke({ color, width: 1 + fireIntensity * 2, alpha: fireIntensity * 0.12 });
     }
 
     // Hit flash overlay
     if (hitFlash > 0.05) {
-      this.auraGfx.circle(x, y, r * 1.3);
-      this.auraGfx.fill({ color: 0xffffff, alpha: hitFlash * 0.08 });
+      this.auraGfx.circle(x, y, r * 1.5);
+      this.auraGfx.fill({ color: 0xffffff, alpha: hitFlash * 0.12 });
     }
 
     // ── 2. Shield arcs (spin faster during intensity) ──
     const shieldSpeedMult = 1 + intensity * 3;
     const shieldR = r * 1.15;
-    for (let ring = 0; ring < 2; ring++) {
+    for (let ring = 0; ring < 3; ring++) {
       const dir = ring === 0 ? 1 : -1;
       const baseAngle = shieldAngle * dir * shieldSpeedMult + ring * 0.4;
       const segments = 5 + ring;
       const gap = 0.18;
       const segArc = (Math.PI * 2 / segments) - gap;
 
+      // Third ring only visible during intensity
+      if (ring === 2 && intensity < 0.3) continue;
       for (let s = 0; s < segments; s++) {
         const startA = baseAngle + s * (segArc + gap);
-        const sr = shieldR + ring * 6;
+        const sr = shieldR + ring * 8;
         const steps = 8;
         this.shieldGfx.moveTo(
           x + Math.cos(startA) * sr, y + Math.sin(startA) * sr
@@ -270,47 +279,87 @@ export class Boss {
           const a = startA + (segArc * j) / steps;
           this.shieldGfx.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
         }
-        const shieldAlpha = (0.15 - ring * 0.04) + intensity * 0.08;
+        const shieldAlpha = (0.15 - ring * 0.035) + intensity * 0.08;
         this.shieldGfx.stroke({
-          color: ring === 0 ? color : 0xffffff,
-          width: 1.2 - ring * 0.4 + intensity * 0.5,
-          alpha: shieldAlpha,
+          color: ring === 2 ? 0xffffff : (ring === 0 ? color : 0xffffff),
+          width: ring === 2 ? (0.6 + intensity * 0.8) : (1.4 - ring * 0.3 + intensity * 0.6),
+          alpha: ring === 2 ? intensity * 0.15 : shieldAlpha,
         });
       }
     }
 
-    // ── 3. Mandala (spins fast + color shift during intensity) ──
+    // ── 3. Mandala — ominous, multi-layered, pulsing sigil ──
     const n = Math.max(3, Math.round(voices));
-    const outerM = r * 0.85;
-    const innerM = r * 0.35;
-    // Mandala spin: base slow + intensity-driven fast spin
-    const mandalaSpeed = 0.02 + intensity * 0.12;
+    const outerM = r * 0.95;
+    const innerM = r * 0.3;
+    const mandalaSpeed = 0.025 + intensity * 0.15;
     const mandalaRot = time * mandalaSpeed;
 
-    // During high intensity: draw multiple mandala layers with color shift
-    const mandalaLayers = intensity > 0.6 ? 2 : 1;
-    for (let layer = 0; layer < mandalaLayers; layer++) {
-      const layerRot = mandalaRot + layer * 0.3;
-      const layerScale = 1 - layer * 0.15;
-      this.mandalaGfx.moveTo(
-        x + Math.cos(layerRot) * outerM * layerScale,
-        y + Math.sin(layerRot) * outerM * layerScale
+    // Layer 0: main sigil — thick, filled, always visible
+    const mg = this.mandalaGfx;
+    const mPulse = 1 + Math.sin(time * 0.05) * 0.04 + fireIntensity * 0.12;
+
+    // Outer spikes — jagged teeth reaching out from the body
+    const spikeN = n * 2;
+    const spikeOuter = outerM * mPulse * 1.15;
+    const spikeInner = outerM * mPulse * 0.75;
+    mg.moveTo(
+      x + Math.cos(mandalaRot) * spikeOuter,
+      y + Math.sin(mandalaRot) * spikeOuter
+    );
+    for (let i = 1; i <= spikeN * 2; i++) {
+      const a = mandalaRot + (Math.PI * i) / spikeN;
+      const sr = i % 2 === 0 ? spikeOuter : spikeInner;
+      mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+    }
+    mg.closePath();
+    mg.stroke({ color, width: 1.2 + intensity * 1.0, alpha: 0.2 + intensity * 0.12 });
+    mg.fill({ color, alpha: 0.025 + intensity * 0.02 });
+
+    // Inner star — counter-rotating, sharper, brighter
+    const innerRot = -mandalaRot * 1.3;
+    const innerOuter = innerM * mPulse * 2.2;
+    const innerInner = innerM * mPulse * 0.6;
+    mg.moveTo(
+      x + Math.cos(innerRot) * innerOuter,
+      y + Math.sin(innerRot) * innerOuter
+    );
+    for (let i = 1; i <= n * 2; i++) {
+      const a = innerRot + (Math.PI * i) / n;
+      const sr = i % 2 === 0 ? innerOuter : innerInner;
+      mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
+    }
+    mg.closePath();
+    mg.stroke({ color: 0xffffff, width: 0.8 + intensity * 0.5, alpha: 0.15 + intensity * 0.1 });
+    mg.fill({ color, alpha: 0.03 + intensity * 0.02 });
+
+    // Connecting radial lines — web-like threads from center to outer tips
+    for (let i = 0; i < spikeN; i++) {
+      const a = mandalaRot + (Math.PI * 2 * i) / spikeN;
+      mg.moveTo(x, y);
+      mg.lineTo(x + Math.cos(a) * spikeOuter * 0.9, y + Math.sin(a) * spikeOuter * 0.9);
+      mg.stroke({ color, width: 0.5, alpha: 0.06 + intensity * 0.06 });
+    }
+
+    // During high intensity: third layer — ghostly expanded copy
+    if (intensity > 0.4) {
+      const ghostRot = mandalaRot * 0.7 + 0.5;
+      const ghostR = outerM * mPulse * 1.4;
+      const ghostInner = outerM * mPulse * 0.5;
+      mg.moveTo(
+        x + Math.cos(ghostRot) * ghostR,
+        y + Math.sin(ghostRot) * ghostR
       );
       for (let i = 1; i <= n * 2; i++) {
-        const a = layerRot + (Math.PI * i) / n;
-        const mr = (i % 2 === 0 ? outerM : innerM) * layerScale;
-        this.mandalaGfx.lineTo(x + Math.cos(a) * mr, y + Math.sin(a) * mr);
+        const a = ghostRot + (Math.PI * i) / n;
+        const sr = i % 2 === 0 ? ghostR : ghostInner;
+        mg.lineTo(x + Math.cos(a) * sr, y + Math.sin(a) * sr);
       }
-      this.mandalaGfx.closePath();
-      const mAlpha = (0.12 + intensity * 0.1) / (layer + 1);
-      this.mandalaGfx.stroke({
-        color: layer === 0 ? color : 0xffffff,
-        width: 0.8 + intensity * 0.6,
-        alpha: mAlpha,
+      mg.closePath();
+      mg.stroke({
+        color, width: 0.6 + (intensity - 0.4) * 1.5,
+        alpha: (intensity - 0.4) * 0.2,
       });
-      if (layer === 0) {
-        this.mandalaGfx.fill({ color, alpha: 0.02 + intensity * 0.015 });
-      }
     }
 
     // ── 4. Core — the EYE ──
@@ -327,22 +376,47 @@ export class Boss {
     this.coreGfx.fill({ color: 0x111122, alpha: 0.3 });
 
     const { eyeX, eyeY } = this;
-    const irisR = coreR * 0.6;
+    const irisR = coreR * 0.65;
     this.coreGfx.circle(eyeX, eyeY, irisR);
-    this.coreGfx.fill({ color, alpha: 0.2 + hitFlash * 0.15 });
+    this.coreGfx.fill({ color, alpha: 0.22 + hitFlash * 0.15 });
     this.coreGfx.circle(eyeX, eyeY, irisR);
-    this.coreGfx.stroke({ color, width: 1.8, alpha: 0.3 });
+    this.coreGfx.stroke({ color, width: 2, alpha: 0.35 });
 
-    const pupilR = coreR * 0.35;
+    // Iris texture — radial lines
+    const irisRot = -time * 0.008;
+    for (let i = 0; i < 8; i++) {
+      const a = irisRot + (Math.PI * 2 * i) / 8;
+      this.coreGfx.moveTo(
+        eyeX + Math.cos(a) * irisR * 0.3,
+        eyeY + Math.sin(a) * irisR * 0.3
+      );
+      this.coreGfx.lineTo(
+        eyeX + Math.cos(a) * irisR * 0.95,
+        eyeY + Math.sin(a) * irisR * 0.95
+      );
+      this.coreGfx.stroke({ color, width: 0.8, alpha: 0.12 + fireIntensity * 0.05 });
+    }
+
+    const pupilR = coreR * 0.38;
     this.coreGfx.circle(eyeX, eyeY, pupilR);
-    this.coreGfx.fill({ color: 0xffffff, alpha: 0.5 + fireIntensity * 0.3 + hitFlash * 0.3 });
+    this.coreGfx.fill({ color: 0xffffff, alpha: 0.55 + fireIntensity * 0.3 + hitFlash * 0.3 });
     this.coreGfx.circle(eyeX, eyeY, pupilR * 0.4);
     this.coreGfx.fill({ color: 0x000000, alpha: 0.55 });
 
+    // Inner glow ring during firing
+    if (fireIntensity > 0.4) {
+      this.coreGfx.circle(eyeX, eyeY, pupilR * 0.7);
+      this.coreGfx.stroke({ color: 0xffffff, width: 0.6, alpha: (fireIntensity - 0.4) * 0.5 });
+    }
+
+    // Primary specular highlight
     const specX = eyeX - coreR * 0.1;
     const specY = eyeY - coreR * 0.12;
-    this.coreGfx.circle(specX, specY, coreR * 0.08);
-    this.coreGfx.fill({ color: 0xffffff, alpha: 0.75 });
+    this.coreGfx.circle(specX, specY, coreR * 0.09);
+    this.coreGfx.fill({ color: 0xffffff, alpha: 0.8 });
+    // Secondary specular
+    this.coreGfx.circle(eyeX + coreR * 0.06, eyeY + coreR * 0.08, coreR * 0.04);
+    this.coreGfx.fill({ color: 0xffffff, alpha: 0.5 });
 
     // Aim line
     const aimLen = r * 0.5;
@@ -362,14 +436,14 @@ export class Boss {
     for (const f of this.emitFlashes) {
       const t = f.life / f.maxLife;
       const vel = f.velocity;
-      const ringR = 3 + (1 - t) * (12 + vel * 10);
+      const ringR = 5 + (1 - t) * (18 + vel * 14);
       this.emitGfx.circle(f.x, f.y, ringR);
-      this.emitGfx.stroke({ color: f.color, width: 1, alpha: t * 0.3 });
-      const flashR = 1.5 + t * (4 + vel * 3);
+      this.emitGfx.stroke({ color: f.color, width: 1.5, alpha: t * 0.35 });
+      const flashR = 2.5 + t * (6 + vel * 5);
       this.emitGfx.circle(f.x, f.y, flashR);
-      this.emitGfx.fill({ color: f.color, alpha: t * 0.45 });
+      this.emitGfx.fill({ color: f.color, alpha: t * 0.5 });
       this.emitGfx.circle(f.x, f.y, flashR * 0.35);
-      this.emitGfx.fill({ color: 0xffffff, alpha: t * 0.65 });
+      this.emitGfx.fill({ color: 0xffffff, alpha: t * 0.7 });
     }
   }
 

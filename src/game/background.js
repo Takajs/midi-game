@@ -2,21 +2,23 @@ import { Graphics, Container } from 'pixi.js';
 import { gameBounds } from '../utils/constants.js';
 
 /**
- * Serene, stable fullscreen background — deep space with parallax star layers
- * and a per-level nebula fog that gives each planet its visual identity.
+ * Deep-space background with parallax star layers, horizontal fog bands,
+ * a soft ambient center glow, and real-time audio-reactive brightness.
+ *
+ * Fog bands span the full screen width and use a gaussian alpha falloff
+ * so they read as atmospheric haze — never confused with gameplay elements.
  */
 export class Background {
   constructor() {
     this.container = new Container();
     this.container.zIndex = 0;
 
-    // Deep dark base (redrawn on resize)
     this.bg = new Graphics();
     this.container.addChild(this.bg);
 
-    // Nebula layer — large soft colored fog, drawn once per theme
-    this.nebulaGfx = new Graphics();
-    this.container.addChild(this.nebulaGfx);
+    // Fog + ambient glow layer (redrawn on resize / theme change)
+    this.fogGfx = new Graphics();
+    this.container.addChild(this.fogGfx);
 
     // Star layers
     this.starLayers = [];
@@ -29,7 +31,7 @@ export class Background {
       this.starGraphics.push(g);
     }
 
-    // Vignette (redrawn on resize)
+    // Vignette
     this.vignette = new Graphics();
     this.container.addChild(this.vignette);
 
@@ -38,7 +40,14 @@ export class Background {
     this._lastH = 0;
     this._bgColor = 0x05050e;
     this._vignetteColor = 0x000000;
-    this._nebulae = null; // array of { x, y, radius, color, alpha }
+    this._fog = null;
+    this._ambientGlow = null;
+    this._fogOffset = 0;
+
+    // Audio reactivity
+    this._intensity = 0;
+    this._targetIntensity = 0;
+
     this._drawStatic();
   }
 
@@ -46,7 +55,8 @@ export class Background {
     if (colors) {
       this._bgColor = colors.bg || 0x05050e;
       this._vignetteColor = colors.vignette || 0x000000;
-      this._nebulae = colors.nebulae || null;
+      this._fog = colors.fog || null;
+      this._ambientGlow = colors.ambientGlow || null;
       if (colors.stars && colors.stars.length === 3) {
         for (let l = 0; l < this.starLayers.length; l++) {
           this.starLayers[l].color = colors.stars[l];
@@ -55,13 +65,18 @@ export class Background {
     } else {
       this._bgColor = 0x05050e;
       this._vignetteColor = 0x000000;
-      this._nebulae = null;
+      this._fog = null;
+      this._ambientGlow = null;
       const defaults = [0x6666aa, 0x8888cc, 0xaaaaee];
       for (let l = 0; l < this.starLayers.length; l++) {
         this.starLayers[l].color = defaults[l];
       }
     }
     this._drawStatic();
+  }
+
+  setIntensity(density) {
+    this._targetIntensity = density;
   }
 
   _initStars() {
@@ -100,45 +115,65 @@ export class Background {
     this.bg.rect(0, 0, w, h);
     this.bg.fill({ color: this._bgColor });
 
-    // Nebula fog — concentric circles fading out, positioned per theme
-    this.nebulaGfx.clear();
-    if (this._nebulae) {
-      for (const n of this._nebulae) {
-        const cx = n.x * w;
-        const cy = n.y * h;
-        const maxR = n.radius * Math.max(w, h);
-        const rings = 10;
-        for (let i = rings; i >= 0; i--) {
-          const t = i / rings;
-          const r = maxR * t;
-          const a = n.alpha * (1 - t) * (1 - t);
-          this.nebulaGfx.circle(cx, cy, r);
-          this.nebulaGfx.fill({ color: n.color, alpha: a });
+    // Fog bands — horizontal strips with gaussian alpha falloff
+    this.fogGfx.clear();
+    if (this._fog) {
+      for (const f of this._fog) {
+        const cy = f.y * h;
+        const sigma = f.spread * h;
+        const bandH = Math.ceil(sigma * 3);
+        const top = Math.max(0, Math.floor(cy - bandH));
+        const bot = Math.min(h, Math.ceil(cy + bandH));
+        // Draw in strips of 4px for performance
+        const step = 4;
+        for (let y = top; y < bot; y += step) {
+          const dist = (y - cy) / sigma;
+          const a = f.alpha * Math.exp(-0.5 * dist * dist);
+          if (a < 0.002) continue;
+          this.fogGfx.rect(0, y, w, step);
+          this.fogGfx.fill({ color: f.color, alpha: a });
         }
       }
     }
 
-    // Vignette
+    // Ambient center glow — a very large, very subtle oval
+    if (this._ambientGlow) {
+      const g = this._ambientGlow;
+      const cx = w * 0.5;
+      const cy = h * 0.45;
+      const rings = 8;
+      const maxR = Math.max(w, h) * 0.45;
+      for (let i = rings; i >= 0; i--) {
+        const t = i / rings;
+        const r = maxR * (0.3 + t * 0.7);
+        const a = g.alpha * (1 - t) * (1 - t);
+        if (a < 0.001) continue;
+        this.fogGfx.ellipse(cx, cy, r, r * 0.7);
+        this.fogGfx.fill({ color: g.color, alpha: a });
+      }
+    }
+
+    // Vignette — darkened edges and corners
     const vc = this._vignetteColor;
     this.vignette.clear();
-    const topDepth = Math.round(h * 0.1);
-    for (let i = 0; i < topDepth; i++) {
-      const alpha = 0.4 * Math.pow(1 - i / topDepth, 2);
-      this.vignette.rect(0, i, w, 1);
+    const topDepth = Math.round(h * 0.12);
+    for (let i = 0; i < topDepth; i += 2) {
+      const alpha = 0.45 * Math.pow(1 - i / topDepth, 2);
+      this.vignette.rect(0, i, w, 2);
       this.vignette.fill({ color: vc, alpha });
     }
-    const botDepth = Math.round(h * 0.08);
-    for (let i = 0; i < botDepth; i++) {
-      const alpha = 0.35 * Math.pow(1 - i / botDepth, 2);
-      this.vignette.rect(0, h - i, w, 1);
+    const botDepth = Math.round(h * 0.12);
+    for (let i = 0; i < botDepth; i += 2) {
+      const alpha = 0.4 * Math.pow(1 - i / botDepth, 2);
+      this.vignette.rect(0, h - i, w, 2);
       this.vignette.fill({ color: vc, alpha });
     }
-    const sideDepth = Math.round(w * 0.03);
-    for (let i = 0; i < sideDepth; i++) {
-      const alpha = 0.2 * Math.pow(1 - i / sideDepth, 2);
-      this.vignette.rect(i, 0, 1, h);
+    const sideDepth = Math.round(w * 0.06);
+    for (let i = 0; i < sideDepth; i += 2) {
+      const alpha = 0.25 * Math.pow(1 - i / sideDepth, 2);
+      this.vignette.rect(i, 0, 2, h);
       this.vignette.fill({ color: vc, alpha });
-      this.vignette.rect(w - i, 0, 1, h);
+      this.vignette.rect(w - i, 0, 2, h);
       this.vignette.fill({ color: vc, alpha });
     }
 
@@ -149,6 +184,9 @@ export class Background {
   update(dt) {
     this.time += dt;
 
+    // Smooth intensity tracking
+    this._intensity += (this._targetIntensity - this._intensity) * 0.06 * dt;
+
     const w = gameBounds.width;
     const h = gameBounds.height;
 
@@ -156,10 +194,16 @@ export class Background {
       this._drawStatic();
     }
 
+    // Intensity boost: foreground stars get brighter during dense passages
+    const intensityBoost = 1 + this._intensity * 0.5;
+
     for (let l = 0; l < this.starLayers.length; l++) {
       const layer = this.starLayers[l];
       const g = this.starGraphics[l];
       g.clear();
+
+      // Front layer gets the most intensity boost
+      const layerBoost = l === 2 ? intensityBoost : (l === 1 ? 1 + this._intensity * 0.25 : 1);
 
       for (const star of layer.stars) {
         star.y += layer.speed * dt;
@@ -170,9 +214,10 @@ export class Background {
 
         star.twinklePhase += star.twinkleSpeed * dt;
         const twinkle = 0.7 + 0.3 * Math.sin(star.twinklePhase);
-        const alpha = star.alpha * twinkle;
+        const alpha = Math.min(1, star.alpha * twinkle * layerBoost);
+        const size = l === 2 ? star.size * (1 + this._intensity * 0.15) : star.size;
 
-        g.circle(star.x, star.y, star.size);
+        g.circle(star.x, star.y, size);
         g.fill({ color: layer.color, alpha });
       }
     }

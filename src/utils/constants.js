@@ -5,10 +5,10 @@ export const gameBounds = {
 };
 
 // Player
-export const PLAYER_RADIUS = 8;
+export const PLAYER_RADIUS = 14;
 export const PLAYER_HITBOX_RADIUS = 3;
-export const PLAYER_SPEED = 5;
-export const PLAYER_FOCUS_SPEED = 2.2;
+export const PLAYER_SPEED = 5.5;
+export const PLAYER_FOCUS_SPEED = 2.4;
 export const PLAYER_START_LIVES = 3;
 export const PLAYER_INVULN_TIME = 2000;
 

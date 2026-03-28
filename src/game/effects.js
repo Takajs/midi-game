@@ -221,9 +221,9 @@ export class EffectsSystem {
     for (const bolt of this.bolts) {
       const t = bolt.life / bolt.maxLife;
       // Glow layer
-      this._drawChain(this.boltGfx, bolt.trunk, bolt.color, 6, t * 0.1);
+      this._drawChain(this.boltGfx, bolt.trunk, bolt.color, 10, t * 0.15);
       for (const br of bolt.branches) {
-        this._drawChain(this.boltGfx, br, bolt.color, 3.5, t * 0.07);
+        this._drawChain(this.boltGfx, br, bolt.color, 5, t * 0.1);
       }
       // Core layer
       this._drawChain(this.boltGfx, bolt.trunk, 0xffffff, 2, t * 0.8);

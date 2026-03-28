@@ -6,9 +6,8 @@ import {
 import { clamp } from '../utils/math.js';
 
 /**
- * Player character.
- * Visually: a layered glowing orb — outer soft aura, mid ring, bright core.
- * Hitbox indicator appears in focus mode as a small jewel-like dot.
+ * Player character — layered glowing orb with engine glow and focus rings.
+ * Hitbox is a tiny 3px dot for fair Touhou-style gameplay.
  */
 export class Player {
   constructor() {
@@ -20,7 +19,6 @@ export class Player {
     this.alive = true;
     this.time = 0;
 
-    // Velocity-based movement with acceleration curve
     this.velX = 0;
     this.velY = 0;
 
@@ -108,30 +106,72 @@ export class Player {
       this.container.alpha = 1;
     }
 
-    this._drawBody();
+    this._drawBody(input.focus);
     this._updatePosition();
   }
 
-  _drawBody() {
+  _drawBody(isFocused) {
     this.gfx.clear();
 
+    const r = this.radius;
     const breath = 0.5 + 0.5 * Math.sin(this.time * 0.04);
+    const speed = Math.sqrt(this.velX * this.velX + this.velY * this.velY);
 
-    const auraR = this.radius + 6 + breath * 3;
+    // Outer aura — soft, large, breathing
+    const auraR = r + 8 + breath * 4;
     this.gfx.circle(0, 0, auraR);
-    this.gfx.fill({ color: 0x8b7ad8, alpha: 0.06 + breath * 0.03 });
+    this.gfx.fill({ color: 0x8b7ad8, alpha: 0.06 + breath * 0.025 });
 
-    this.gfx.circle(0, 0, this.radius + 2);
-    this.gfx.fill({ color: 0xa78bfa, alpha: 0.15 });
+    // Mid ring
+    this.gfx.circle(0, 0, r + 3);
+    this.gfx.fill({ color: 0xa78bfa, alpha: 0.18 });
 
-    this.gfx.circle(0, 0, this.radius);
+    // Main body
+    this.gfx.circle(0, 0, r);
     this.gfx.fill({ color: 0xc4b5fd, alpha: 0.92 });
 
-    this.gfx.circle(0, 0, this.radius);
-    this.gfx.stroke({ color: 0xe0d4ff, width: 1, alpha: 0.6 });
+    // Rim stroke
+    this.gfx.circle(0, 0, r);
+    this.gfx.stroke({ color: 0xe0d4ff, width: 1.2, alpha: 0.6 });
 
-    this.gfx.circle(0, 0, 2.5);
+    // Inner glow
+    this.gfx.circle(0, 0, r * 0.55);
+    this.gfx.fill({ color: 0xe0d4ff, alpha: 0.15 + breath * 0.05 });
+
+    // Bright core
+    this.gfx.circle(0, 0, 3.5);
     this.gfx.fill({ color: 0xffffff, alpha: 0.95 });
+
+    // Engine glow (bottom) — scales with speed
+    const engineSize = 2.5 + speed * 0.4 + breath * 1.5;
+    this.gfx.circle(0, r + 3, engineSize + 4);
+    this.gfx.fill({ color: 0x60a5fa, alpha: 0.06 + speed * 0.015 });
+    this.gfx.circle(0, r + 3, engineSize);
+    this.gfx.fill({ color: 0x93c5fd, alpha: 0.35 + speed * 0.08 });
+    this.gfx.circle(0, r + 3, engineSize * 0.35);
+    this.gfx.fill({ color: 0xffffff, alpha: 0.65 });
+
+    // Focus mode — precision rings
+    if (isFocused) {
+      const rot1 = this.time * 0.015;
+      const rot2 = -this.time * 0.012;
+      const r1 = r * 1.8;
+      const r2 = r * 2.3;
+      const segs = 8;
+      const gap = 0.12;
+      const segArc = (Math.PI * 2 / segs) - gap;
+      for (let s = 0; s < segs; s++) {
+        const a = rot1 + s * (segArc + gap);
+        this.gfx.arc(0, 0, r1, a, a + segArc);
+        this.gfx.stroke({ color: 0xc4b5fd, width: 0.8, alpha: 0.18 });
+      }
+      for (let s = 0; s < segs + 2; s++) {
+        const arcLen = Math.PI * 2 / (segs + 2) - gap * 0.8;
+        const a = rot2 + s * (arcLen + gap * 0.8);
+        this.gfx.arc(0, 0, r2, a, a + arcLen);
+        this.gfx.stroke({ color: 0xa78bfa, width: 0.5, alpha: 0.12 });
+      }
+    }
   }
 
   hit() {

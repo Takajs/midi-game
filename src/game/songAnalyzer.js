@@ -88,8 +88,8 @@ export function analyzeSong(events, duration, midiMin, midiMax, bpm) {
     const yDrift2 = Math.cos(t * Math.PI * 9.3) * h * 0.03;
     bossY[i] = baseY + intensityPush + yDrift1 + yDrift2;
 
-    // Radius: base 55, grows with density and complexity
-    bossRadius[i] = 55 + d * 25 + complexity[i] * 15;
+    // Radius: base 80, grows with density and complexity
+    bossRadius[i] = 80 + d * 35 + complexity[i] * 20;
 
     // Color: dominant pitch at the average octave
     const avgOct = Math.round(register[i] * 8);

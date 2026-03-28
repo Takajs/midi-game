@@ -61,8 +61,8 @@ export class PatternSpawner {
     const spdMult = this.theme ? this.theme.speedMult : 1;
     const sizMult = this.theme ? this.theme.sizeMult : 1;
     const spd = (1.2 + vel * 1.5 + oct * 0.12) * spdMult;
-    const baseRad = Math.max(2.5, 6.5 - oct * 0.4 + vel * 2) * sizMult;
-    const bossRad = baseRad * (1.1 + vel * 0.5);
+    const baseRad = Math.max(4, 9 - oct * 0.5 + vel * 3) * sizMult;
+    const bossRad = baseRad * (1.15 + vel * 0.6);
     const ambRad = baseRad * 0.6;
     const rng = seededRandom(midi * 31 + Math.floor(performance.now()));
     const mn = midi, nv = vel, oc = oct, dur = duration || 0.2;

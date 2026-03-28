@@ -69,6 +69,9 @@ export class Game {
     // Bolt cooldown
     this._boltCooldown = 0;
 
+    // Audio reactivity
+    this._bassPulse = 0;
+
     // Player shot graphics (PixiJS)
     this._shotGfx = null;
   }
@@ -152,6 +155,7 @@ export class Game {
     this._beamLookahead = 0;
     this._beamWarned.clear();
     this._boltCooldown = 0;
+    this._bassPulse = 0;
 
     // Clear score popups
     this.scorePopupsEl.innerHTML = '';
@@ -195,6 +199,7 @@ export class Game {
     this.renderer.ticker.remove(this._boundUpdate);
     this.audio.stop();
     this.renderer.stage.position.set(0, 0);
+    this.renderer.stage.scale.set(1, 1);
   }
 
   _showUpload() {
@@ -240,6 +245,32 @@ export class Game {
     this.effects.update(dt, this.renderer.stage);
     this.particles.update(dt);
     this.background.update(dt);
+
+    // ── Audio reactivity ──
+    if (this.songAnalysis) {
+      const wi = Math.min(
+        Math.floor(currentTime / this.songAnalysis.windowSize),
+        this.songAnalysis.windowCount - 1
+      );
+      const density = this.songAnalysis.density[Math.max(0, wi)];
+      this.background.setIntensity(density);
+
+      // Ambient motes during quiet passages
+      if (density < 0.2 && Math.random() < 0.12) {
+        const moteColor = this.theme ? this.theme.bossColor : 0x8888cc;
+        this.particles.spawnAmbientMote(moteColor);
+      }
+    }
+
+    // Bass pulse — subtle zoom on heavy bass hits
+    if (this._bassPulse > 0.001) {
+      const s = 1 + this._bassPulse;
+      this.renderer.stage.scale.set(s, s);
+      this._bassPulse *= Math.pow(0.8, dt);
+    } else if (this._bassPulse > 0) {
+      this._bassPulse = 0;
+      this.renderer.stage.scale.set(1, 1);
+    }
 
     // Player shots → boss collision
     this._updatePlayerShots(dt);
@@ -423,7 +454,7 @@ export class Game {
         this.patterns.spawnForNote(note, this.player.x, this.player.y);
       }
 
-      // Thunderbolt
+      // Bass notes — impact, shake, bolts
       if (note.octave <= 2 && note.velocity > 0.72 && this._boltCooldown <= 0) {
         const color = noteColor(note.midi);
         this.effects.addBolt(spawnX, color);
@@ -431,9 +462,23 @@ export class Game {
         this.particles.spawnBoltSpark(spawnX, 0, color);
         this.particles.spawnBoltSpark(spawnX, gameBounds.height, color);
         this._boltCooldown = 40;
+        this._bassPulse = Math.min(this._bassPulse + 0.006, 0.012);
       }
       else if (note.octave <= 2 && note.velocity > 0.55) {
         this.effects.shake(note.velocity * 1.5);
+        this._bassPulse = Math.min(this._bassPulse + 0.004, 0.01);
+      }
+
+      // Bass impact particles
+      if (note.octave <= 2 && note.velocity > 0.5) {
+        const ep = this.boss.getEmitPoint();
+        this.particles.spawnBassImpact(ep.x, ep.y, note.velocity, noteColor(note.midi));
+      }
+
+      // High note sparkles
+      if (note.octave >= 6) {
+        const ep = this.boss.getEmitPoint();
+        this.particles.spawnHighSparkle(ep.x, ep.y);
       }
 
       // Gravity well
@@ -512,7 +557,7 @@ export class Game {
       if (dist < grazeRange && dist > PLAYER_HITBOX_RADIUS + d.radius[i]) {
         this.state.addScore(5);
         this.state.grazeCount++;
-        if (Math.random() < 0.08) this.particles.spawnGraze(d.x[i], d.y[i]);
+        if (Math.random() < 0.25) this.particles.spawnGraze(d.x[i], d.y[i]);
       }
     }
   }
