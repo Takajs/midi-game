@@ -16,7 +16,7 @@ export const LEVELS = [
     file: 'Mercurio.mid',
     name: 'Mercurio',
     subtitle: 'Scorched Messenger',
-    difficulty: 2,
+    difficulty: 1,
     css: {
       gradient: 'radial-gradient(circle at 35% 35%, #b8a090 0%, #7a6050 50%, #3a2820 100%)',
       glow: 'rgba(180, 140, 100, 0.5)',
@@ -85,7 +85,7 @@ export const LEVELS = [
     file: 'Luna.mid',
     name: 'Luna',
     subtitle: 'Silent Guardian',
-    difficulty: 1,
+    difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 38% 32%, #e0dcd8 0%, #a8a4a0 50%, #58544e 100%)',
       glow: 'rgba(200, 200, 215, 0.5)',
@@ -130,7 +130,7 @@ export const LEVELS = [
     file: 'Jupiter.mid',
     name: 'Jupiter',
     subtitle: 'King of Storms',
-    difficulty: 4,
+    difficulty: 5,
     css: {
       gradient: 'radial-gradient(circle at 40% 35%, #d4a060 0%, #b07830 40%, #6a4420 100%)',
       glow: 'rgba(200, 150, 70, 0.5)',
@@ -154,7 +154,7 @@ export const LEVELS = [
     file: 'Saturno.mid',
     name: 'Saturno',
     subtitle: 'Lord of the Rings',
-    difficulty: 3,
+    difficulty: 4,
     css: {
       gradient: 'radial-gradient(circle at 38% 35%, #e8d498 0%, #c4a458 45%, #7a6430 100%)',
       glow: 'rgba(210, 190, 120, 0.5)',
@@ -178,7 +178,7 @@ export const LEVELS = [
     file: 'Urano.mid',
     name: 'Urano',
     subtitle: 'Frozen Enigma',
-    difficulty: 4,
+    difficulty: 3,
     css: {
       gradient: 'radial-gradient(circle at 42% 38%, #88dde8 0%, #50a0b8 50%, #1a4a5a 100%)',
       glow: 'rgba(100, 200, 220, 0.5)',
