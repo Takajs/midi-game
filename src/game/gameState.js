@@ -15,13 +15,15 @@ export class GameState {
     this.isGameOver = false;
     this.isVictory = false;
     this.currentTime = 0;
-    this.noteIndex = 0; // Current position in the sorted note events
+    this.noteIndex = 0;
     this.songDuration = 0;
     this.songName = '';
     this.totalNotes = 0;
     this.notesSpawned = 0;
     this.grazeCount = 0;
     this.bulletsDodged = 0;
+    this.bombCharges = 3;
+    this.bossHits = 0;
   }
 
   loseLife() {
@@ -30,6 +32,12 @@ export class GameState {
       this.isGameOver = true;
       this.isPlaying = false;
     }
+  }
+
+  useBomb() {
+    if (this.bombCharges <= 0) return false;
+    this.bombCharges--;
+    return true;
   }
 
   addScore(amount) {

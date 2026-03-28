@@ -13,6 +13,13 @@ import { Background } from './background.js';
 import { Boss } from './boss.js';
 import { GameState } from './gameState.js';
 import { analyzeSong } from './songAnalyzer.js';
+import { Graphics } from 'pixi.js';
+
+// ─── Player shot constants ───
+const SHOT_SPEED = 7;
+const SHOT_RADIUS = 3;
+const SHOT_COOLDOWN = 8; // frames between shots
+const MAX_PLAYER_SHOTS = 30;
 
 export class Game {
   constructor() {
@@ -33,17 +40,23 @@ export class Game {
     // Wire boss to patterns
     this.patterns.boss = this.boss;
 
+    // Player shots (simple array, not SoA — low count)
+    this.playerShots = [];
+    this.shotCooldown = 0;
+
     // UI
     this.uploadScreen = document.getElementById('upload-screen');
     this.loadingIndicator = document.getElementById('loading-indicator');
     this.hud = document.getElementById('hud');
     this.livesEl = document.getElementById('lives');
+    this.bombsEl = document.getElementById('bombs');
     this.scoreEl = document.getElementById('score');
     this.songTitleEl = document.getElementById('song-title');
     this.gameOverScreen = document.getElementById('game-over-screen');
     this.gameOverStats = document.getElementById('game-over-stats');
     this.victoryScreen = document.getElementById('victory-screen');
     this.victoryStats = document.getElementById('victory-stats');
+    this.scorePopupsEl = document.getElementById('score-popups');
 
     this.lastFrameTime = 0;
     this._boundUpdate = this._update.bind(this);
@@ -54,6 +67,9 @@ export class Game {
 
     // Bolt cooldown
     this._boltCooldown = 0;
+
+    // Player shot graphics (PixiJS)
+    this._shotGfx = null;
   }
 
   async init() {
@@ -69,6 +85,11 @@ export class Game {
     stage.addChild(this.effects.container);
     stage.addChild(this.particles.container);
     stage.addChild(this.player.container);
+
+    // Player shot layer — above bullets, below player
+    this._shotGfx = new Graphics();
+    this._shotGfx.zIndex = 90;
+    stage.addChild(this._shotGfx);
 
     this._setupUIHandlers();
   }
@@ -124,9 +145,14 @@ export class Game {
     this.particles.clear();
     this.effects.clear();
     this.input.reset();
+    this.playerShots.length = 0;
+    this.shotCooldown = 0;
     this._beamLookahead = 0;
     this._beamWarned.clear();
     this._boltCooldown = 0;
+
+    // Clear score popups
+    this.scorePopupsEl.innerHTML = '';
 
     // Configure boss with pre-computed script
     this.boss.reset();
@@ -158,6 +184,7 @@ export class Game {
     this.bullets.clearAll();
     this.particles.clear();
     this.effects.clear();
+    this.playerShots.length = 0;
   }
 
   // ─── Main loop ───
@@ -178,6 +205,14 @@ export class Game {
     this._processNotes(currentTime);
     this._processBeamLookahead(currentTime);
 
+    // Player shooting
+    this._updatePlayerShooting(dt);
+
+    // Bomb
+    if (this.input.bomb) {
+      this._activateBomb();
+    }
+
     this.player.update(dt, this.input);
     this.boss.update(dt, currentTime, this.player.x, this.player.y);
     this.effects.applyWells(this.bullets.data);
@@ -186,7 +221,13 @@ export class Game {
     this.particles.update(dt);
     this.background.update(dt);
 
-    // Collision
+    // Player shots → boss collision
+    this._updatePlayerShots(dt);
+
+    // Bomb ring clearing bullets
+    this._updateBombClearing();
+
+    // Player collision with enemy bullets
     if (this.player.invulnTimer <= 0) {
       const bulletHit = this.bullets.checkCollision(
         this.player.x, this.player.y, PLAYER_HITBOX_RADIUS
@@ -209,9 +250,138 @@ export class Game {
     this.effects.render();
     this.particles.render();
     this.boss.render(this.player.x, this.player.y);
+    this._renderPlayerShots();
 
     if (Math.floor(now) % 3 === 0) this._updateHUD();
     if (currentTime >= this.state.songDuration + 3) this._onVictory();
+  }
+
+  // ─── Player shooting ───
+
+  _updatePlayerShooting(dt) {
+    if (this.shotCooldown > 0) this.shotCooldown -= dt;
+
+    const dir = this.input.getShootDir();
+    if (dir && this.shotCooldown <= 0 &&
+        this.playerShots.length < MAX_PLAYER_SHOTS) {
+      // Twin-shot with slight perpendicular offset
+      const perpX = -dir.y * 5;
+      const perpY = dir.x * 5;
+      this.playerShots.push({
+        x: this.player.x + perpX,
+        y: this.player.y + perpY,
+        vx: dir.x * SHOT_SPEED,
+        vy: dir.y * SHOT_SPEED,
+      });
+      this.playerShots.push({
+        x: this.player.x - perpX,
+        y: this.player.y - perpY,
+        vx: dir.x * SHOT_SPEED,
+        vy: dir.y * SHOT_SPEED,
+      });
+
+      this.shotCooldown = SHOT_COOLDOWN;
+    }
+  }
+
+  _updatePlayerShots(dt) {
+    for (let i = this.playerShots.length - 1; i >= 0; i--) {
+      const s = this.playerShots[i];
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+
+      // Out of bounds
+      if (s.x < -20 || s.x > gameBounds.width + 20 ||
+          s.y < -20 || s.y > gameBounds.height + 20) {
+        this.playerShots.splice(i, 1);
+        continue;
+      }
+
+      // Boss dodge (react to nearby shots)
+      const dxB = s.x - this.boss.x;
+      const dyB = s.y - this.boss.y;
+      const distB = Math.sqrt(dxB * dxB + dyB * dyB);
+      if (distB < this.boss.radius * 2.5) {
+        this.boss.dodge(s.x, s.y);
+      }
+
+      // Hit detection
+      const hit = this.boss.checkHit(s.x, s.y, SHOT_RADIUS);
+      if (hit) {
+        this.state.addScore(hit.points);
+        this.state.bossHits++;
+        this._spawnScorePopup(s.x, s.y, hit.points, hit.isEye);
+        this.playerShots.splice(i, 1);
+
+        // Hit particles
+        this.particles.spawnHitRing(s.x, s.y);
+      }
+    }
+  }
+
+  _renderPlayerShots() {
+    const g = this._shotGfx;
+    if (!g) return;
+    g.clear();
+
+    for (const s of this.playerShots) {
+      // Glow
+      g.circle(s.x, s.y, SHOT_RADIUS * 2.5);
+      g.fill({ color: 0x60a5fa, alpha: 0.12 });
+      // Core
+      g.circle(s.x, s.y, SHOT_RADIUS);
+      g.fill({ color: 0xaaccff, alpha: 0.85 });
+      // Bright center
+      g.circle(s.x, s.y, SHOT_RADIUS * 0.4);
+      g.fill({ color: 0xffffff, alpha: 0.95 });
+    }
+  }
+
+  // ─── Bomb ───
+
+  _activateBomb() {
+    if (!this.state.useBomb()) return;
+
+    this.effects.addBombRing(this.player.x, this.player.y);
+    this.effects.shake(4);
+    this._updateHUD();
+  }
+
+  _updateBombClearing() {
+    const ringR = this.effects.getBombRingRadius();
+    if (ringR <= 0) return;
+
+    const pos = this.effects.getBombRingPos();
+    if (!pos) return;
+
+    const d = this.bullets.data;
+    const hw = this.bullets.highWater;
+
+    for (let i = 0; i < hw; i++) {
+      if (!d.alive[i]) continue;
+      const dx = d.x[i] - pos.x;
+      const dy = d.y[i] - pos.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // Clear bullets inside the ring (with a small buffer)
+      if (dist < ringR + 10) {
+        this.bullets._kill(i);
+        this.state.bulletsDodged++;
+      }
+    }
+  }
+
+  // ─── Score popups (DOM-based, CSS animated) ───
+
+  _spawnScorePopup(x, y, points, isEye) {
+    const el = document.createElement('div');
+    el.className = `score-popup ${isEye ? 'eye-hit' : 'body-hit'}`;
+    el.textContent = `+${points}`;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    this.scorePopupsEl.appendChild(el);
+
+    // Remove after animation completes
+    el.addEventListener('animationend', () => el.remove());
   }
 
   // ─── Note processing ───
@@ -334,7 +504,7 @@ export class Game {
   _onVictory() {
     this._stopGame();
     this.victoryStats.textContent =
-      `Score: ${this.state.score.toLocaleString()} | Lives remaining: ${this.state.lives} | Grazes: ${this.state.grazeCount}`;
+      `Score: ${this.state.score.toLocaleString()} | Lives remaining: ${this.state.lives} | Grazes: ${this.state.grazeCount} | Boss hits: ${this.state.bossHits}`;
     this.victoryScreen.classList.add('active');
   }
 
@@ -344,6 +514,13 @@ export class Game {
       livesHTML += `<div class="life ${i >= this.state.lives ? 'lost' : ''}"></div>`;
     }
     this.livesEl.innerHTML = livesHTML;
+
+    let bombsHTML = '';
+    for (let i = 0; i < 3; i++) {
+      bombsHTML += `<div class="bomb-charge ${i >= this.state.bombCharges ? 'used' : ''}"></div>`;
+    }
+    this.bombsEl.innerHTML = bombsHTML;
+
     this.scoreEl.textContent = `Score: ${this.state.score.toLocaleString()}`;
   }
 }

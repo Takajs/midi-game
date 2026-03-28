@@ -23,13 +23,16 @@ export class EffectsSystem {
     this.beamGfx = new Graphics();
     this.boltGfx = new Graphics();
     this.wellGfx = new Graphics();
+    this.bombGfx = new Graphics();
     this.container.addChild(this.beamGfx);
     this.container.addChild(this.wellGfx);
     this.container.addChild(this.boltGfx);
+    this.container.addChild(this.bombGfx);
 
     this.bolts = [];
     this.beams = [];
     this.wells = [];
+    this.bombRing = null;
 
     this.shakeIntensity = 0;
   }
@@ -154,6 +157,18 @@ export class EffectsSystem {
       this.wells[i].life -= dt;
       if (this.wells[i].life <= 0) this.wells.splice(i, 1);
     }
+
+    // Bomb ring expansion
+    if (this.bombRing) {
+      const br = this.bombRing;
+      br.life -= dt;
+      // Expand to cover full screen diagonal in ~30 frames
+      const maxR = Math.sqrt(gameBounds.width ** 2 + gameBounds.height ** 2) * 0.6;
+      const progress = 1 - br.life / br.maxLife;
+      // Ease-out expansion (fast start, gentle end)
+      br.radius = maxR * (1 - Math.pow(1 - progress, 2.5));
+      if (br.life <= 0) this.bombRing = null;
+    }
   }
 
   // ─── Render ───
@@ -162,6 +177,7 @@ export class EffectsSystem {
     this.boltGfx.clear();
     this.beamGfx.clear();
     this.wellGfx.clear();
+    this.bombGfx.clear();
     const h = gameBounds.height;
 
     // ── Beams ──
@@ -231,6 +247,21 @@ export class EffectsSystem {
       this.wellGfx.circle(w.x, w.y, 3 + t * 2);
       this.wellGfx.fill({ color: 0x9966ff, alpha: t * 0.18 });
     }
+
+    // ── Bomb ring ──
+    if (this.bombRing) {
+      const br = this.bombRing;
+      const t = br.life / br.maxLife;
+      // Outer glow ring
+      this.bombGfx.circle(br.x, br.y, br.radius);
+      this.bombGfx.stroke({ color: 0xaaccff, width: 4 + t * 8, alpha: t * 0.5 });
+      // Inner bright ring
+      this.bombGfx.circle(br.x, br.y, br.radius * 0.97);
+      this.bombGfx.stroke({ color: 0xffffff, width: 2 + t * 3, alpha: t * 0.7 });
+      // Faint fill
+      this.bombGfx.circle(br.x, br.y, br.radius);
+      this.bombGfx.fill({ color: 0xaaccff, alpha: t * 0.03 });
+    }
   }
 
   _drawChain(g, pts, color, width, alpha) {
@@ -264,10 +295,29 @@ export class EffectsSystem {
     return false;
   }
 
+  // ─── Bomb ring ───
+
+  addBombRing(x, y) {
+    this.bombRing = { x, y, radius: 0, life: 30, maxLife: 30 };
+  }
+
+  /**
+   * Returns current bomb ring radius (or 0 if inactive).
+   * game.js uses this to clear bullets inside the ring.
+   */
+  getBombRingRadius() {
+    return this.bombRing ? this.bombRing.radius : 0;
+  }
+
+  getBombRingPos() {
+    return this.bombRing ? { x: this.bombRing.x, y: this.bombRing.y } : null;
+  }
+
   clear() {
     this.bolts.length = 0;
     this.beams.length = 0;
     this.wells.length = 0;
     this.shakeIntensity = 0;
+    this.bombRing = null;
   }
 }
