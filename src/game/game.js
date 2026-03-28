@@ -9,6 +9,7 @@ import { ParticleSystem } from './particles.js';
 import { Background } from './background.js';
 import { NoteLanes } from './noteLanes.js';
 import { GameState } from './gameState.js';
+import { generateElementTextures } from './elements.js';
 
 export class Game {
   constructor() {
@@ -38,12 +39,19 @@ export class Game {
 
     this.lastFrameTime = 0;
     this._boundUpdate = this._update.bind(this);
+    this._sweepTimer = 0;     // ambient edge sweeper timer
+    this._lastNoteTime = 0;   // track when notes last fired
+    this._sweepSide = 0;      // alternating corner
   }
 
   async init() {
     const appEl = document.getElementById('app');
     await this.renderer.init(appEl);
     await this.audio.init();
+
+    // Generate element textures now that renderer is ready
+    const textures = generateElementTextures(this.renderer.pixiRenderer);
+    this.bullets.setTextures(textures);
 
     const stage = this.renderer.stage;
     stage.sortableChildren = true;
@@ -97,6 +105,9 @@ export class Game {
     this.bullets.clearAll();
     this.particles.clear();
     this.input.reset();
+    this._sweepTimer = 0;
+    this._lastNoteTime = 0;
+    this._sweepSide = 0;
 
     this.audio.stop();
     await this.audio.loadSong(this.midiData);
@@ -136,6 +147,7 @@ export class Game {
     const currentTime = this.state.currentTime;
 
     this._processNotes(currentTime);
+    this._ambientSweep(dt);
 
     this.player.update(dt, this.input);
     this.bullets.update(dt, this.player.x, this.player.y);
@@ -178,21 +190,76 @@ export class Game {
       const note = events[i];
       this.state.noteIndex = i + 1;
       this.state.notesSpawned++;
+      this._lastNoteTime = this._sweepTimer;
 
       if (this.bullets.activeCount >= MAX_ACTIVE_BULLETS) continue;
 
-      // Spawn bullet pattern
       this.patterns.spawnForNote(note, this.player.x, this.player.y);
 
-      // Spawn position uses full MIDI note: bass→left, treble→right
       const spawnX = (note.midi / 127) * gameBounds.width * 0.85 + gameBounds.width * 0.075;
 
-      // Visual feedback: light up the spectrum lane at this note's position
       this.noteLanes.trigger(note.midi, note.velocity);
-
-      // Spawn bloom and embers using full MIDI note for unique color
       this.particles.spawnBloom(spawnX, 4, note.midi, note.velocity);
       this.particles.spawnNoteEmber(note.midi, spawnX, note.velocity);
+    }
+  }
+
+  /**
+   * Ambient edge sweeper — fires gentle bullets from corners/edges
+   * to prevent safe-zone camping. Fires more aggressively during
+   * quiet sections (no notes for a while) and gently during music.
+   */
+  _ambientSweep(dt) {
+    this._sweepTimer += dt;
+    const timeSinceNote = this._sweepTimer - this._lastNoteTime;
+
+    // Base interval: every ~90 frames (~1.5s). Faster when quiet.
+    const interval = timeSinceNote > 60 ? 30 : 90;
+    if (this._sweepTimer < interval) return;
+    this._sweepTimer = 0;
+
+    const w = gameBounds.width;
+    const h = gameBounds.height;
+    const side = this._sweepSide++ % 4;
+
+    // Quietness boost: more bullets when no notes are playing
+    const count = timeSinceNote > 60 ? 4 : 2;
+    const speed = 1.0 + (timeSinceNote > 60 ? 0.4 : 0);
+
+    const base = { midiNote: 60, noteVel: 0.3, octave: 4, duration: 0.3 };
+
+    for (let i = 0; i < count; i++) {
+      const t = (i + 0.5) / count;
+      switch (side) {
+        case 0: // top-left corner → diagonal
+          this.bullets.spawn({
+            ...base, x: t * w * 0.3, y: -10,
+            vx: speed * 0.5, vy: speed * 0.9,
+            radius: 3.5, type: 5, param: 0.6,
+          });
+          break;
+        case 1: // top-right corner → diagonal
+          this.bullets.spawn({
+            ...base, x: w - t * w * 0.3, y: -10,
+            vx: -speed * 0.5, vy: speed * 0.9,
+            radius: 3.5, type: 5, param: -0.6,
+          });
+          break;
+        case 2: // left wall
+          this.bullets.spawn({
+            ...base, x: -10, y: t * h * 0.5,
+            vx: speed * 0.8, vy: speed * 0.3,
+            radius: 3, type: 5, param: -0.8,
+          });
+          break;
+        case 3: // right wall
+          this.bullets.spawn({
+            ...base, x: w + 10, y: t * h * 0.5,
+            vx: -speed * 0.8, vy: speed * 0.3,
+            radius: 3, type: 5, param: 0.8,
+          });
+          break;
+      }
     }
   }
 

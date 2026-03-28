@@ -51,6 +51,10 @@ export class Renderer {
     return this.app.ticker;
   }
 
+  get pixiRenderer() {
+    return this.app.renderer;
+  }
+
   destroy() {
     this.app.destroy(true);
   }

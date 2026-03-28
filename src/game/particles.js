@@ -1,39 +1,71 @@
 import { Graphics, Container } from 'pixi.js';
-import { gameBounds } from '../utils/constants.js';
-import { noteColor, midiNoteColorTable } from '../utils/noteColor.js';
+import { noteColor } from '../utils/noteColor.js';
 
 const MAX_PARTICLES = 800;
+const MAX_BLOOMS = 200;
 
 /**
- * Particle system using full-spectrum note colors.
- * Blooms and embers match the exact note (pitch + octave),
- * not just the pitch class.
+ * High-performance particle system using struct-of-arrays
+ * with swap-and-pop removal (O(1) per removal vs O(n) splice).
  */
 export class ParticleSystem {
   constructor() {
-    this.particles = [];
     this.container = new Container();
     this.container.zIndex = 80;
     this.gfx = new Graphics();
     this.container.addChild(this.gfx);
-    this.blooms = [];
+
+    // --- Particle SoA ---
+    this.pCount = 0;
+    this.px      = new Float32Array(MAX_PARTICLES);
+    this.py      = new Float32Array(MAX_PARTICLES);
+    this.pvx     = new Float32Array(MAX_PARTICLES);
+    this.pvy     = new Float32Array(MAX_PARTICLES);
+    this.plife   = new Float32Array(MAX_PARTICLES);
+    this.pmaxLife= new Float32Array(MAX_PARTICLES);
+    this.psize   = new Float32Array(MAX_PARTICLES);
+    this.pcolor  = new Uint32Array(MAX_PARTICLES);
+    this.pfriction = new Float32Array(MAX_PARTICLES);
+
+    // --- Bloom SoA ---
+    this.bCount = 0;
+    this.bx       = new Float32Array(MAX_BLOOMS);
+    this.by       = new Float32Array(MAX_BLOOMS);
+    this.bradius  = new Float32Array(MAX_BLOOMS);
+    this.bmaxR    = new Float32Array(MAX_BLOOMS);
+    this.blife    = new Float32Array(MAX_BLOOMS);
+    this.bmaxLife = new Float32Array(MAX_BLOOMS);
+    this.bcolor   = new Uint32Array(MAX_BLOOMS);
+    this.bvel     = new Float32Array(MAX_BLOOMS);
+  }
+
+  // --- Spawn helpers ---
+
+  _addParticle(x, y, vx, vy, life, maxLife, size, color, friction = 0) {
+    if (this.pCount >= MAX_PARTICLES) return;
+    const i = this.pCount++;
+    this.px[i] = x;  this.py[i] = y;
+    this.pvx[i] = vx; this.pvy[i] = vy;
+    this.plife[i] = life; this.pmaxLife[i] = maxLife;
+    this.psize[i] = size; this.pcolor[i] = color;
+    this.pfriction[i] = friction;
+  }
+
+  _addBloom(x, y, maxRadius, life, maxLife, color, velocity) {
+    if (this.bCount >= MAX_BLOOMS) return;
+    const i = this.bCount++;
+    this.bx[i] = x;  this.by[i] = y;
+    this.bradius[i] = 2; this.bmaxR[i] = maxRadius;
+    this.blife[i] = life; this.bmaxLife[i] = maxLife;
+    this.bcolor[i] = color; this.bvel[i] = velocity;
   }
 
   /**
-   * Spawn bloom at bullet birth point.
-   * Uses the full MIDI note number for unique color.
+   * Bloom at bullet birth point. Full MIDI note color.
    */
   spawnBloom(x, y, midiNote, velocity) {
     const color = noteColor(midiNote);
-    this.blooms.push({
-      x, y,
-      radius: 2,
-      maxRadius: 12 + velocity * 18,
-      life: 20 + velocity * 10,
-      maxLife: 30,
-      color,
-      velocity,
-    });
+    this._addBloom(x, y, 12 + velocity * 18, 20 + velocity * 10, 30, color, velocity);
   }
 
   /**
@@ -43,16 +75,16 @@ export class ParticleSystem {
     const color = noteColor(midiNote);
     const count = 1 + Math.floor(velocity * 3);
     for (let i = 0; i < count; i++) {
-      this.particles.push({
-        x: x + (Math.random() - 0.5) * 16,
-        y: 4 + Math.random() * 8,
-        vx: (Math.random() - 0.5) * (0.4 + velocity * 0.8),
-        vy: 0.2 + Math.random() * 0.6 + velocity * 0.3,
-        life: 20 + Math.random() * 15 + velocity * 10,
-        maxLife: 45,
-        size: 0.6 + Math.random() * 1.2 + velocity * 0.8,
+      this._addParticle(
+        x + (Math.random() - 0.5) * 16,
+        4 + Math.random() * 8,
+        (Math.random() - 0.5) * (0.4 + velocity * 0.8),
+        0.2 + Math.random() * 0.6 + velocity * 0.3,
+        20 + Math.random() * 15 + velocity * 10,
+        45,
+        0.6 + Math.random() * 1.2 + velocity * 0.8,
         color,
-      });
+      );
     }
   }
 
@@ -60,28 +92,14 @@ export class ParticleSystem {
     for (let i = 0; i < 20; i++) {
       const angle = (Math.PI * 2 * i) / 20;
       const speed = 1.5 + Math.random() * 2;
-      this.particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 35 + Math.random() * 20,
-        maxLife: 55,
-        size: 1.5 + Math.random() * 2,
-        color: 0xf4a0c0,
-      });
+      this._addParticle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed,
+        35 + Math.random() * 20, 55, 1.5 + Math.random() * 2, 0xf4a0c0);
     }
     for (let i = 0; i < 6; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 0.5 + Math.random() * 1.5;
-      this.particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 15 + Math.random() * 10,
-        maxLife: 25,
-        size: 1 + Math.random() * 1.5,
-        color: 0xffffff,
-      });
+      this._addParticle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed,
+        15 + Math.random() * 10, 25, 1 + Math.random() * 1.5, 0xffffff);
     }
   }
 
@@ -89,80 +107,109 @@ export class ParticleSystem {
     for (let i = 0; i < 36; i++) {
       const angle = (Math.PI * 2 * i) / 36;
       const speed = 0.5 + Math.random() * 3;
-      // Spread across different MIDI notes for varied colors
       const midiNote = 20 + Math.floor((i / 36) * 80);
-      this.particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 60 + Math.random() * 50,
-        maxLife: 110,
-        size: 1.5 + Math.random() * 3,
-        color: noteColor(midiNote),
-        friction: 0.985,
-      });
+      this._addParticle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed,
+        60 + Math.random() * 50, 110, 1.5 + Math.random() * 3, noteColor(midiNote), 0.985);
     }
   }
 
   spawnGraze(x, y) {
-    this.particles.push({
-      x: x + (Math.random() - 0.5) * 6,
-      y: y + (Math.random() - 0.5) * 6,
-      vx: (Math.random() - 0.5) * 1,
-      vy: (Math.random() - 0.5) * 1,
-      life: 10 + Math.random() * 8,
-      maxLife: 18,
-      size: 0.6 + Math.random() * 1,
-      color: 0xffffff,
-    });
+    this._addParticle(
+      x + (Math.random() - 0.5) * 6,
+      y + (Math.random() - 0.5) * 6,
+      (Math.random() - 0.5), (Math.random() - 0.5),
+      10 + Math.random() * 8, 18,
+      0.6 + Math.random(), 0xffffff,
+    );
   }
 
+  // --- Update with swap-and-pop ---
+
   update(dt) {
-    if (this.particles.length > MAX_PARTICLES) {
-      this.particles.splice(0, this.particles.length - MAX_PARTICLES);
+    // Update particles
+    let i = 0;
+    while (i < this.pCount) {
+      this.px[i] += this.pvx[i] * dt;
+      this.py[i] += this.pvy[i] * dt;
+      this.plife[i] -= dt;
+
+      if (this.pfriction[i]) {
+        this.pvx[i] *= this.pfriction[i];
+        this.pvy[i] *= this.pfriction[i];
+      }
+
+      if (this.plife[i] <= 0) {
+        // Swap-and-pop: move last element here
+        const last = this.pCount - 1;
+        if (i < last) {
+          this.px[i] = this.px[last];  this.py[i] = this.py[last];
+          this.pvx[i] = this.pvx[last]; this.pvy[i] = this.pvy[last];
+          this.plife[i] = this.plife[last]; this.pmaxLife[i] = this.pmaxLife[last];
+          this.psize[i] = this.psize[last]; this.pcolor[i] = this.pcolor[last];
+          this.pfriction[i] = this.pfriction[last];
+        }
+        this.pCount--;
+        continue; // re-check swapped element at same index
+      }
+      i++;
     }
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.life -= dt;
-      if (p.friction) { p.vx *= p.friction; p.vy *= p.friction; }
-      if (p.life <= 0) this.particles.splice(i, 1);
-    }
-    for (let i = this.blooms.length - 1; i >= 0; i--) {
-      const b = this.blooms[i];
-      b.life -= dt;
-      b.radius = 2 + (1 - b.life / b.maxLife) * b.maxRadius;
-      if (b.life <= 0) this.blooms.splice(i, 1);
+
+    // Update blooms
+    i = 0;
+    while (i < this.bCount) {
+      this.blife[i] -= dt;
+      this.bradius[i] = 2 + (1 - this.blife[i] / this.bmaxLife[i]) * this.bmaxR[i];
+
+      if (this.blife[i] <= 0) {
+        const last = this.bCount - 1;
+        if (i < last) {
+          this.bx[i] = this.bx[last]; this.by[i] = this.by[last];
+          this.bradius[i] = this.bradius[last]; this.bmaxR[i] = this.bmaxR[last];
+          this.blife[i] = this.blife[last]; this.bmaxLife[i] = this.bmaxLife[last];
+          this.bcolor[i] = this.bcolor[last]; this.bvel[i] = this.bvel[last];
+        }
+        this.bCount--;
+        continue;
+      }
+      i++;
     }
   }
 
   render() {
     this.gfx.clear();
-    for (const b of this.blooms) {
-      const t = Math.max(0, b.life / b.maxLife);
-      const alpha = t * t * 0.4 * (0.5 + b.velocity * 0.5);
-      this.gfx.circle(b.x, b.y, b.radius);
-      this.gfx.stroke({ color: b.color, width: 1.5 + b.velocity, alpha, cap: 'round' });
+
+    // Blooms
+    for (let i = 0; i < this.bCount; i++) {
+      const t = Math.max(0, this.blife[i] / this.bmaxLife[i]);
+      const alpha = t * t * 0.4 * (0.5 + this.bvel[i] * 0.5);
+      const color = this.bcolor[i];
+
+      this.gfx.circle(this.bx[i], this.by[i], this.bradius[i]);
+      this.gfx.stroke({ color, width: 1.5 + this.bvel[i], alpha, cap: 'round' });
+
       if (t > 0.5) {
-        this.gfx.circle(b.x, b.y, b.radius * 0.5);
-        this.gfx.fill({ color: b.color, alpha: (t - 0.5) * 0.15 });
+        this.gfx.circle(this.bx[i], this.by[i], this.bradius[i] * 0.5);
+        this.gfx.fill({ color, alpha: (t - 0.5) * 0.15 });
       }
     }
-    for (const p of this.particles) {
-      const t = Math.max(0, p.life / p.maxLife);
+
+    // Particles
+    for (let i = 0; i < this.pCount; i++) {
+      const t = Math.max(0, this.plife[i] / this.pmaxLife[i]);
       const alpha = t * t;
-      const size = p.size * (0.4 + 0.6 * t);
+      const size = this.psize[i] * (0.4 + 0.6 * t);
       if (size < 0.3) continue;
-      this.gfx.circle(p.x, p.y, size + 1.5);
-      this.gfx.fill({ color: p.color, alpha: alpha * 0.12 });
-      this.gfx.circle(p.x, p.y, size);
-      this.gfx.fill({ color: p.color, alpha: alpha * 0.8 });
+      const color = this.pcolor[i];
+
+      this.gfx.circle(this.px[i], this.py[i], size + 1.5);
+      this.gfx.fill({ color, alpha: alpha * 0.12 });
+      this.gfx.circle(this.px[i], this.py[i], size);
+      this.gfx.fill({ color, alpha: alpha * 0.8 });
     }
   }
 
   clear() {
-    this.particles.length = 0;
-    this.blooms.length = 0;
+    this.pCount = 0;
+    this.bCount = 0;
   }
 }

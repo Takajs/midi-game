@@ -26,8 +26,15 @@ export const PATTERNS = {
   SPIRAL: 'spiral',
   WAVE: 'wave',
   RAIN: 'rain',
+  CROSSFIRE: 'crossfire',   // side-wall diagonal curtains
+  ARC: 'arc',               // curved arcing shots from edges
 };
 
-// Track visual styles (cycle for tracks > 4)
-// 0 = filled orb, 1 = hollow ring, 2 = rimmed orb, 3 = compact dense
-export const TRACK_STYLES = 4;
+// Musical elements — derived from MIDI register
+export const ELEMENTS = {
+  EARTH: 0,     // midi 0-35: heavy, gravitational
+  WATER: 1,     // midi 36-59: flowing, sinuous
+  FIRE: 2,      // midi 60-83: bright, radiant
+  AIR: 3,       // midi 84-107: light, sparkly
+  LIGHTNING: 4,  // midi 108+: electric, sharp
+};
