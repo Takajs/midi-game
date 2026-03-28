@@ -292,16 +292,31 @@ export class Game {
 
     // Player collision with enemy bullets
     if (this.player.invulnTimer <= 0) {
-      const bulletHit = this.bullets.checkCollision(
-        this.player.x, this.player.y, PLAYER_HITBOX_RADIUS
-      );
-      if (bulletHit) {
-        this._onPlayerHit();
+      // Boss body contact — highest priority, most punishing
+      // The danger zone covers the full visual extent: shield arcs, mandala,
+      // and Saturn ring if present. Nothing you can see should be safe to touch.
+      const dxBoss = this.player.x - this.boss.x;
+      const dyBoss = this.player.y - this.boss.y;
+      const distBoss = Math.sqrt(dxBoss * dxBoss + dyBoss * dyBoss);
+      const bossR = this.boss.radius;
+      // Base danger zone = shield arcs outer edge (~1.15r + 16px for 3rd ring)
+      let dangerRadius = bossR * 1.3 + 16;
+      // Saturn ring extends way further horizontally — use the widest ring band
+      if (this.boss.hasRing) dangerRadius = Math.max(dangerRadius, bossR * 2.0);
+      if (distBoss < dangerRadius + PLAYER_HITBOX_RADIUS) {
+        this._onBossContact(dxBoss, dyBoss, distBoss);
       } else {
-        const effectHit = this.effects.checkCollision(
+        const bulletHit = this.bullets.checkCollision(
           this.player.x, this.player.y, PLAYER_HITBOX_RADIUS
         );
-        if (effectHit) this._onPlayerHit();
+        if (bulletHit) {
+          this._onPlayerHit();
+        } else {
+          const effectHit = this.effects.checkCollision(
+            this.player.x, this.player.y, PLAYER_HITBOX_RADIUS
+          );
+          if (effectHit) this._onPlayerHit();
+        }
       }
     }
 
@@ -544,6 +559,61 @@ export class Game {
     if (this.state.isGameOver) {
       this.particles.spawnDeathBloom(this.player.x, this.player.y);
       this.effects.shake(10);
+      setTimeout(() => {
+        this._stopGame();
+        this.gameOverStats.textContent =
+          `PUNTUACIÓN: ${this.state.score.toLocaleString()} | Te has pasado el: ${this.state.survivalPercent}% del nivel`;
+        this.gameOverScreen.classList.add('active');
+      }, 1500);
+    }
+    this._updateHUD();
+  }
+
+  // ─── Boss body contact — violent rejection ───
+
+  _onBossContact(dx, dy, dist) {
+    const wasHit = this.player.hit();
+    if (!wasHit) return;
+
+    this.state.loseLife();
+
+    // Contact point: midway between player and boss center
+    const contactX = this.boss.x + dx * 0.5;
+    const contactY = this.boss.y + dy * 0.5;
+
+    // Free bomb ring at contact point — clears surrounding bullets
+    this.effects.addBombRing(contactX, contactY);
+
+    // Cosmic knockback — player is launched across the screen
+    const norm = dist || 1;
+    const knockForce = 28;
+    this.player.knockback(
+      (dx / norm) * knockForce,
+      (dy / norm) * knockForce
+    );
+
+    // Devastating screen shake — the cosmic roar
+    this.effects.shake(16);
+    this._bassPulse = Math.min(this._bassPulse + 0.035, 0.05);
+
+    // Explosion at contact — double death bloom for massive visual
+    this.particles.spawnDeathBloom(contactX, contactY);
+    this.particles.spawnDeathBloom(this.boss.x, this.boss.y);
+    this.particles.spawnHitRing(contactX, contactY);
+    this.particles.spawnHitRing(this.boss.x, this.boss.y);
+
+    // Boss recoils hard and flashes
+    this.boss.dodgeX -= (dx / norm) * 12;
+    this.boss.dodgeY -= (dy / norm) * 12;
+    this.boss.hitFlash = 1.0;
+    this.boss.fireIntensity = 1.0;
+
+    // Clear all bullets (mercy — boss contact is already punishing)
+    this.bullets.clearAll();
+
+    if (this.state.isGameOver) {
+      this.particles.spawnDeathBloom(this.player.x, this.player.y);
+      this.effects.shake(14);
       setTimeout(() => {
         this._stopGame();
         this.gameOverStats.textContent =

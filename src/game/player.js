@@ -170,6 +170,15 @@ export class Player {
     return true;
   }
 
+  /**
+   * Apply a violent knockback impulse (boss contact, etc.).
+   * Overrides current velocity — the player is ejected.
+   */
+  knockback(vx, vy) {
+    this.velX = vx;
+    this.velY = vy;
+  }
+
   reset() {
     this.x = gameBounds.width / 2;
     this.y = gameBounds.height - 80;
