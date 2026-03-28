@@ -30,6 +30,18 @@ export function parseMidi(arrayBuffer) {
   // Sort by time
   events.sort((a, b) => a.time - b.time);
 
+  // Precompute actual note range for this song
+  let midiMin = 127, midiMax = 0;
+  for (const e of events) {
+    if (e.midi < midiMin) midiMin = e.midi;
+    if (e.midi > midiMax) midiMax = e.midi;
+  }
+  // Ensure at least a small range so we don't divide by zero
+  if (midiMax - midiMin < 6) {
+    midiMin = Math.max(0, midiMin - 3);
+    midiMax = Math.min(127, midiMax + 3);
+  }
+
   return {
     events,
     duration: midi.duration,
@@ -37,5 +49,7 @@ export function parseMidi(arrayBuffer) {
     bpm: midi.header.tempos.length > 0 ? midi.header.tempos[0].bpm : 120,
     trackCount,
     totalNotes: events.length,
+    midiMin,
+    midiMax,
   };
 }

@@ -18,16 +18,29 @@ export const MAX_ACTIVE_BULLETS = 2500;
 
 // Bullet pattern types
 export const PATTERNS = {
-  SINGLE: 'single',
-  SPREAD: 'spread',
-  RING: 'ring',
-  AIMED: 'aimed',
-  STREAM: 'stream',
-  SPIRAL: 'spiral',
-  WAVE: 'wave',
-  RAIN: 'rain',
+  SINGLE:    0,
+  SPREAD:    1,
+  RING:      2,
+  AIMED:     3,
+  STREAM:    4,
+  SPIRAL:    5,
+  WAVE:      6,
+  RAIN:      7,
+  CROSSFIRE: 8,
+  ARC:       9,
+  HELIX:     10,
+  FLOWER:    11,
+  CASCADE:   12,
+  VORTEX:    13,
 };
 
-// Track visual styles (cycle for tracks > 4)
-// 0 = filled orb, 1 = hollow ring, 2 = rimmed orb, 3 = compact dense
-export const TRACK_STYLES = 4;
+// Trajectory types
+export const TRAJ = {
+  STRAIGHT:  0,
+  WAVY:      1,
+  ACCEL:     2,
+  HOMING:    3,
+  DECEL:     4,  // slow → pause → burst forward
+  SINE_ARC:  5,  // curving arc
+  BOOMERANG: 6,  // decelerates, reverses
+};

@@ -1,4 +1,6 @@
 import { gameBounds, PLAYER_HITBOX_RADIUS, MAX_ACTIVE_BULLETS } from '../utils/constants.js';
+import { configure as configureNoteRange, noteToX } from '../utils/noteRange.js';
+import { noteColor } from '../utils/noteColor.js';
 import { Renderer } from '../engine/renderer.js';
 import { InputManager } from '../engine/input.js';
 import { AudioEngine } from '../audio/audioEngine.js';
@@ -6,9 +8,11 @@ import { Player } from './player.js';
 import { BulletSystem } from './bullet.js';
 import { PatternSpawner } from './patterns.js';
 import { ParticleSystem } from './particles.js';
+import { EffectsSystem } from './effects.js';
 import { Background } from './background.js';
-import { NoteLanes } from './noteLanes.js';
+import { Boss } from './boss.js';
 import { GameState } from './gameState.js';
+import { analyzeSong } from './songAnalyzer.js';
 
 export class Game {
   constructor() {
@@ -19,12 +23,17 @@ export class Game {
     this.bullets = new BulletSystem();
     this.patterns = new PatternSpawner(this.bullets);
     this.particles = new ParticleSystem();
+    this.effects = new EffectsSystem();
     this.background = new Background();
-    this.noteLanes = new NoteLanes();
+    this.boss = new Boss();
     this.state = new GameState();
     this.midiData = null;
+    this.songAnalysis = null;
 
-    // UI refs
+    // Wire boss to patterns
+    this.patterns.boss = this.boss;
+
+    // UI
     this.uploadScreen = document.getElementById('upload-screen');
     this.loadingIndicator = document.getElementById('loading-indicator');
     this.hud = document.getElementById('hud');
@@ -38,6 +47,13 @@ export class Game {
 
     this.lastFrameTime = 0;
     this._boundUpdate = this._update.bind(this);
+
+    // Beam look-ahead
+    this._beamLookahead = 0;
+    this._beamWarned = new Set();
+
+    // Bolt cooldown
+    this._boltCooldown = 0;
   }
 
   async init() {
@@ -48,9 +64,10 @@ export class Game {
     const stage = this.renderer.stage;
     stage.sortableChildren = true;
     stage.addChild(this.background.container);
+    stage.addChild(this.boss.container);
     stage.addChild(this.bullets.container);
+    stage.addChild(this.effects.container);
     stage.addChild(this.particles.container);
-    stage.addChild(this.noteLanes.container);
     stage.addChild(this.player.container);
 
     this._setupUIHandlers();
@@ -79,6 +96,13 @@ export class Game {
     this.midiData = midiData;
     this.loadingIndicator.classList.add('active');
     await new Promise(r => setTimeout(r, 100));
+
+    // Pre-analyze the entire song during loading
+    this.songAnalysis = analyzeSong(
+      midiData.events, midiData.duration,
+      midiData.midiMin, midiData.midiMax, midiData.bpm
+    );
+
     await this.audio.loadSong(midiData);
     this.loadingIndicator.classList.remove('active');
     this.uploadScreen.classList.add('hidden');
@@ -93,10 +117,20 @@ export class Game {
     this.state.totalNotes = this.midiData.totalNotes;
     this.state.isPlaying = true;
 
+    configureNoteRange(this.midiData.midiMin, this.midiData.midiMax);
+
     this.player.reset();
     this.bullets.clearAll();
     this.particles.clear();
+    this.effects.clear();
     this.input.reset();
+    this._beamLookahead = 0;
+    this._beamWarned.clear();
+    this._boltCooldown = 0;
+
+    // Configure boss with pre-computed script
+    this.boss.reset();
+    this.boss.setScript(this.songAnalysis, this.midiData.midiMin, this.midiData.midiMax);
 
     this.audio.stop();
     await this.audio.loadSong(this.midiData);
@@ -114,6 +148,7 @@ export class Game {
     this.state.isPlaying = false;
     this.renderer.ticker.remove(this._boundUpdate);
     this.audio.stop();
+    this.renderer.stage.position.set(0, 0);
   }
 
   _showUpload() {
@@ -122,7 +157,10 @@ export class Game {
     this.uploadScreen.classList.remove('hidden');
     this.bullets.clearAll();
     this.particles.clear();
+    this.effects.clear();
   }
+
+  // ─── Main loop ───
 
   _update() {
     if (!this.state.isPlaying) return;
@@ -135,38 +173,48 @@ export class Game {
     this.state.currentTime = this.audio.getCurrentTime();
     const currentTime = this.state.currentTime;
 
+    if (this._boltCooldown > 0) this._boltCooldown -= dt;
+
     this._processNotes(currentTime);
+    this._processBeamLookahead(currentTime);
 
     this.player.update(dt, this.input);
+    this.boss.update(dt, currentTime, this.player.x, this.player.y);
+    this.effects.applyWells(this.bullets.data);
     this.bullets.update(dt, this.player.x, this.player.y);
+    this.effects.update(dt, this.renderer.stage);
     this.particles.update(dt);
     this.background.update(dt);
-    this.noteLanes.update(dt);
 
+    // Collision
     if (this.player.invulnTimer <= 0) {
-      const hit = this.bullets.checkCollision(
+      const bulletHit = this.bullets.checkCollision(
         this.player.x, this.player.y, PLAYER_HITBOX_RADIUS
       );
-      if (hit) {
+      if (bulletHit) {
         this._onPlayerHit();
+      } else {
+        const effectHit = this.effects.checkCollision(
+          this.player.x, this.player.y, PLAYER_HITBOX_RADIUS
+        );
+        if (effectHit) this._onPlayerHit();
       }
     }
 
     this._checkGraze();
     this.state.addScore(Math.floor(dt * 10));
 
+    // Render
     this.bullets.render();
+    this.effects.render();
     this.particles.render();
-    this.noteLanes.render();
+    this.boss.render(this.player.x, this.player.y);
 
-    if (Math.floor(now) % 3 === 0) {
-      this._updateHUD();
-    }
-
-    if (currentTime >= this.state.songDuration + 3) {
-      this._onVictory();
-    }
+    if (Math.floor(now) % 3 === 0) this._updateHUD();
+    if (currentTime >= this.state.songDuration + 3) this._onVictory();
   }
+
+  // ─── Note processing ───
 
   _processNotes(currentTime) {
     const events = this.midiData.events;
@@ -179,22 +227,67 @@ export class Game {
       this.state.noteIndex = i + 1;
       this.state.notesSpawned++;
 
-      if (this.bullets.activeCount >= MAX_ACTIVE_BULLETS) continue;
+      const spawnX = noteToX(note.midi);
 
-      // Spawn bullet pattern
-      this.patterns.spawnForNote(note, this.player.x, this.player.y);
+      if (this.bullets.activeCount < MAX_ACTIVE_BULLETS) {
+        this.patterns.spawnForNote(note, this.player.x, this.player.y);
+      }
 
-      // Spawn position uses full MIDI note: bass→left, treble→right
-      const spawnX = (note.midi / 127) * gameBounds.width * 0.85 + gameBounds.width * 0.075;
-
-      // Visual feedback: light up the spectrum lane at this note's position
-      this.noteLanes.trigger(note.midi, note.velocity);
-
-      // Spawn bloom and embers using full MIDI note for unique color
+      // Visual feedback
       this.particles.spawnBloom(spawnX, 4, note.midi, note.velocity);
       this.particles.spawnNoteEmber(note.midi, spawnX, note.velocity);
+
+      // Thunderbolt
+      if (note.octave <= 2 && note.velocity > 0.72 && this._boltCooldown <= 0) {
+        const color = noteColor(note.midi);
+        this.effects.addBolt(spawnX, color);
+        this.effects.shake(note.velocity * 3);
+        this.particles.spawnBoltSpark(spawnX, 0, color);
+        this.particles.spawnBoltSpark(spawnX, gameBounds.height, color);
+        this._boltCooldown = 40;
+      }
+      else if (note.octave <= 2 && note.velocity > 0.55) {
+        this.effects.shake(note.velocity * 1.5);
+      }
+
+      // Gravity well
+      if (note.octave <= 1 && note.velocity > 0.45) {
+        this.effects.addWell(spawnX, gameBounds.height * 0.3,
+          note.velocity * 3, 50 + note.velocity * 35);
+      }
     }
   }
+
+  // ─── Beam look-ahead ───
+
+  _processBeamLookahead(currentTime) {
+    const events = this.midiData.events;
+    const lookahead = 2.0;
+
+    while (this._beamLookahead < events.length) {
+      const note = events[this._beamLookahead];
+      if (note.time > currentTime + lookahead) break;
+      if (note.time < currentTime) { this._beamLookahead++; continue; }
+
+      if (note.duration > 1.2 && note.velocity > 0.55 &&
+          !this._beamWarned.has(this._beamLookahead)) {
+        this._beamWarned.add(this._beamLookahead);
+
+        const x = noteToX(note.midi);
+        const color = noteColor(note.midi);
+        const timeUntil = note.time - currentTime;
+        const warmup = Math.max(25, timeUntil * 60);
+        const active = Math.min(40, note.duration * 20);
+        const width = 20 + note.velocity * 18;
+
+        this.effects.addBeam(x, width, warmup, active, color);
+        this.particles.spawnBeamShimmer(x, color);
+      }
+      this._beamLookahead++;
+    }
+  }
+
+  // ─── Player hit ───
 
   _onPlayerHit() {
     const wasHit = this.player.hit();
@@ -202,10 +295,12 @@ export class Game {
 
     this.state.loseLife();
     this.particles.spawnHitRing(this.player.x, this.player.y);
+    this.effects.shake(6);
     this.bullets.clearAll();
 
     if (this.state.isGameOver) {
       this.particles.spawnDeathBloom(this.player.x, this.player.y);
+      this.effects.shake(10);
       setTimeout(() => {
         this._stopGame();
         this.gameOverStats.textContent =
@@ -213,27 +308,25 @@ export class Game {
         this.gameOverScreen.classList.add('active');
       }, 1500);
     }
-
     this._updateHUD();
   }
 
+  // ─── Graze ───
+
   _checkGraze() {
     const d = this.bullets.data;
-    const px = this.player.x;
-    const py = this.player.y;
+    const px = this.player.x, py = this.player.y;
     const grazeRange = 20;
+    const hw = this.bullets.highWater;
 
-    for (let i = 0; i < d.size; i++) {
+    for (let i = 0; i < hw; i++) {
       if (!d.alive[i]) continue;
-      const dx = d.x[i] - px;
-      const dy = d.y[i] - py;
+      const dx = d.x[i] - px, dy = d.y[i] - py;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < grazeRange && dist > PLAYER_HITBOX_RADIUS + d.radius[i]) {
         this.state.addScore(5);
         this.state.grazeCount++;
-        if (Math.random() < 0.1) {
-          this.particles.spawnGraze(d.x[i], d.y[i]);
-        }
+        if (Math.random() < 0.08) this.particles.spawnGraze(d.x[i], d.y[i]);
       }
     }
   }

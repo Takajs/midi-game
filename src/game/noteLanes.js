@@ -1,6 +1,7 @@
 import { Graphics, Container } from 'pixi.js';
 import { gameBounds } from '../utils/constants.js';
 import { noteColor } from '../utils/noteColor.js';
+import { noteToX } from '../utils/noteRange.js';
 
 const BAR_HEIGHT = 4;
 const FADE_SPEED = 0.91;
@@ -61,7 +62,7 @@ export class NoteLanes {
 
       const intensity = this.intensity[i];
       const color = noteColor(i);
-      const cx = (i / 127) * w * 0.85 + w * 0.075; // Same mapping as spawn positions
+      const cx = noteToX(i); // Same mapping as spawn positions
       const blobW = w / 30; // Width of each glow blob
 
       // Main glow on the bar
