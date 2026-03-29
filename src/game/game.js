@@ -562,7 +562,7 @@ export class Game {
       setTimeout(() => {
         this._stopGame();
         this.gameOverStats.textContent =
-          `PUNTUACIÓN: ${this.state.score.toLocaleString()} | Te has pasado el: ${this.state.survivalPercent}% del nivel`;
+          `SCORE: ${this.state.score.toLocaleString()} | You cleared: ${this.state.survivalPercent}% of this level`;
         this.gameOverScreen.classList.add('active');
       }, 1500);
     }
@@ -617,7 +617,7 @@ export class Game {
       setTimeout(() => {
         this._stopGame();
         this.gameOverStats.textContent =
-          `PUNTUACIÓN: ${this.state.score.toLocaleString()} | Te has pasado el: ${this.state.survivalPercent}% del nivel`;
+          `SCORE: ${this.state.score.toLocaleString()} | You cleared: ${this.state.survivalPercent}% of this level`;
         this.gameOverScreen.classList.add('active');
       }, 1500);
     }
@@ -647,12 +647,12 @@ export class Game {
   _onVictory() {
     this._stopGame();
     this.victoryStats.textContent =
-      `PUNTUACIÓN: ${this.state.score.toLocaleString()} | VIDAS RESTANTES: ${this.state.lives} | Grazes: ${this.state.grazeCount} | Boss hits: ${this.state.bossHits}`;
+      `Score: ${this.state.score.toLocaleString()} | Remaining lifes: ${this.state.lives} | Grazes: ${this.state.grazeCount} | Boss hits: ${this.state.bossHits}`;
     this.victoryScreen.classList.add('active');
   }
 
   _checkMilestone() {
-    const milestone = Math.floor(this.state.score / 75000);
+    const milestone = Math.floor(this.state.score / 50000);
     if (milestone <= this.state.lastMilestone) return;
     this.state.lastMilestone = milestone;
 
@@ -670,7 +670,7 @@ export class Game {
 
     // Visual notification
     const el = this.milestoneEl;
-    el.textContent = isLife ? '+1 VIDA' : '+1 BOMBA';
+    el.textContent = isLife ? '+1 LIFE' : '+1 BOMB';
     el.className = 'milestone-notify active ' + (isLife ? 'life-reward' : 'bomb-reward');
     // Reset animation
     el.offsetWidth; // force reflow
@@ -721,7 +721,7 @@ export class Game {
     }
     this.bombsEl.innerHTML = bombsHTML;
 
-    this.scoreEl.textContent = `PUNTUACIÓN: ${this.state.score.toLocaleString()}`;
+    this.scoreEl.textContent = `SCORE: ${this.state.score.toLocaleString()}`;
   }
 
   _tintBossColors(analysis, themeColor) {

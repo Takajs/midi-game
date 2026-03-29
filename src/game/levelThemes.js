@@ -14,9 +14,9 @@ export const LEVELS = [
   {
     id: 'Mercurio',
     file: 'Mercurio.mid',
-    name: 'nivel noob 1',
-    subtitle: 'para noobs',
-    difficulty: 1,
+    name: 'Vogel im Käfig',
+    subtitle: `Bird in cage`,
+    difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 35% 35%, #b8a090 0%, #7a6050 50%, #3a2820 100%)',
       glow: 'rgba(180, 140, 100, 0.5)',
@@ -38,9 +38,9 @@ export const LEVELS = [
   {
     id: 'Venus',
     file: 'Venus.mid',
-    name: 'nivel noob 2',
-    subtitle: 'para noobs',
-    difficulty: 2,
+    name: 'Moonlight 1',
+    subtitle: 'Op 027 No 02 Piano Sonata No 14 1st Mov ”Moonlight Sonata',
+    difficulty: 1,
     css: {
       gradient: 'radial-gradient(circle at 40% 30%, #e8c86a 0%, #c49a3a 45%, #6a4a18 100%)',
       glow: 'rgba(220, 180, 80, 0.5)',
@@ -62,8 +62,8 @@ export const LEVELS = [
   {
     id: 'Tierra',
     file: 'Tierra.mid',
-    name: 'nivel noob 3',
-    subtitle: 'para noobs',
+    name: 'RSE ending',
+    subtitle: 'Pokémon Ruby, Sapphire, Emerald ending',
     difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 40% 35%, #6ab4e8 0%, #3a8a3a 40%, #2a4a6a 100%)',
@@ -86,9 +86,9 @@ export const LEVELS = [
   {
     id: 'Luna',
     file: 'Luna.mid',
-    name: 'una de Bach',
-    subtitle: 'la mitica',
-    difficulty: 2,
+    name: 'Bach',
+    subtitle: 'Toccata and Fugue in D minor, BWV 565',
+    difficulty: 3,
     css: {
       gradient: 'radial-gradient(circle at 38% 32%, #e0dcd8 0%, #a8a4a0 50%, #58544e 100%)',
       glow: 'rgba(200, 200, 215, 0.5)',
@@ -109,9 +109,9 @@ export const LEVELS = [
   {
     id: 'Marte',
     file: 'Marte.mid',
-    name: 'arenisca',
-    subtitle: 'planeta arenisca',
-    difficulty: 3,
+    name: 'My War',
+    subtitle: 'Boku no Sensou',
+    difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 35% 35%, #d47050 0%, #9a3a28 50%, #4a1a10 100%)',
       glow: 'rgba(200, 80, 50, 0.5)',
@@ -133,8 +133,8 @@ export const LEVELS = [
   {
     id: 'Jupiter',
     file: 'Jupiter.mid',
-    name: 'lag',
-    subtitle: 'va lag si mantienes movimiento pulsado jeje luego se arregla uwu',
+    name: 'Moonlight 3',
+    subtitle: 'Op 027 No 03 Piano Sonata No 14 1st Mov ”Moonlight Sonata (may lag)',
     difficulty: 5,
     css: {
       gradient: 'radial-gradient(circle at 40% 35%, #d4a060 0%, #b07830 40%, #6a4420 100%)',
@@ -158,8 +158,8 @@ export const LEVELS = [
   {
     id: 'Saturno',
     file: 'Saturno.mid',
-    name: 'nivel jodido',
-    subtitle: ':(',
+    name: 'Saturn',
+    subtitle: '???',
     difficulty: 4,
     css: {
       gradient: 'radial-gradient(circle at 38% 35%, #e8d498 0%, #c4a458 45%, #7a6430 100%)',
@@ -183,9 +183,9 @@ export const LEVELS = [
   {
     id: 'Urano',
     file: 'Urano.mid',
-    name: 'lo q sea',
-    subtitle: 'nose',
-    difficulty: 3,
+    name: 'VS Regice',
+    subtitle: 'Regi battle theme',
+    difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 42% 38%, #88dde8 0%, #50a0b8 50%, #1a4a5a 100%)',
       glow: 'rgba(100, 200, 220, 0.5)',
