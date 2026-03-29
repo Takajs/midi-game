@@ -183,8 +183,8 @@ export const LEVELS = [
   {
     id: 'Urano',
     file: 'Urano.mid',
-    name: 'VS Regice',
-    subtitle: 'Regi battle theme',
+    name: 'Rachmanninov',
+    subtitle: 'Moments Musicaux No 04 in E min Presto Op 16 No 04',
     difficulty: 2,
     css: {
       gradient: 'radial-gradient(circle at 42% 38%, #88dde8 0%, #50a0b8 50%, #1a4a5a 100%)',
